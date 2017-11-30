@@ -1,3 +1,5 @@
+#define NEOPG_VERSION "@NeoPG_VERSION_STRING_FULL@"
+
 #define LOCALEDIR "/usr/share/neopg"
 #define GNUPG_LOCALSTATEDIR "/usr/share/neopg"
 
@@ -7,19 +9,15 @@
 #define GNUPG_DATADIR     "/usr/share/neopg"
 #define GNUPG_SYSCONFDIR  "/etc/neopg"
 
-#cmakedefine HAVE_MALLOC_H 1
-
 #define PACKAGE "neopg"
 #define PACKAGE_GT PACKAGE
 
-#define VERSION "0.0"
+#define VERSION NEOPG_VERSION
 #define PACKAGE_NAME "neopg"
-/* stringhelp.cpp */
-
-/* agent */
 
 /* libassuan */
 #define USE_DESCRIPTOR_PASSING 1
+
 /* npth */
 #define HAVE_PSELECT 1
 #define HAVE_CLOCK_GETTIME 1

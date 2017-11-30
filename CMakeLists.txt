@@ -3,8 +3,18 @@
 #
 # NeoPG is released under the Simplified BSD License (see license.txt)
 
+# Cmake setup.
 cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
-project(NeoPG VERSION 0.1 LANGUAGES C CXX)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(GitVersion)
+set(NeoPG_VERSION_STRING "${GIT_VERSION_STRING}")
+set(NeoPG_VERSION_STRING_FULL "${GIT_VERSION_STRING_FULL}")
+
+project(NeoPG VERSION "${NeoPG_VERSION_STRING}")
+message(STATUS "${PROJECT_NAME} ${${PROJECT_NAME}_VERSION_STRING_FULL}")
+
+# targets: release, changelog
+include(GitRelease)
 
 # Compiler setup.
 
@@ -54,8 +64,6 @@ set(JSON_INCLUDE_DIR ${JSON_ROOT}/include)
 
 include(ProcessorCount)
 ProcessorCount(PROCESSOR_COUNT)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 
