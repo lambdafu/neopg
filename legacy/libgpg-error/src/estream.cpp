@@ -1930,7 +1930,6 @@ out:
 }
 
 /*
-/*
  * Try to unread DATA_N bytes from DATA into STREAM, storing the
  * amount of bytes successfully unread at BYTES_UNREAD.
  */
@@ -2095,7 +2094,7 @@ static int es_write_fbf(estream_t _GPGRT__RESTRICT stream,
   return err;
 }
 
-static void *memrchr(const void *buffer, int c, size_t n) {
+static void *mymemrchr(const void *buffer, int c, size_t n) {
   const unsigned char *p = (const unsigned char *)buffer;
 
   for (p += n; n; n--)
@@ -2115,7 +2114,7 @@ static int es_write_lbf(estream_t _GPGRT__RESTRICT stream,
   unsigned char *nlp;
   int err = 0;
 
-  nlp = (unsigned char *)memrchr(buffer, '\n', bytes_to_write);
+  nlp = (unsigned char *)mymemrchr(buffer, '\n', bytes_to_write);
   if (nlp) {
     /* Found a newline, directly write up to (including) this
        character.  */

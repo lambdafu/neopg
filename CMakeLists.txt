@@ -143,7 +143,10 @@ file(GLOB_RECURSE ALL_SOURCE_FILES
      ${CMAKE_SOURCE_DIR}/src/*.cpp
      ${CMAKE_SOURCE_DIR}/src/*.h
      ${CMAKE_SOURCE_DIR}/include/*.cpp
-     ${CMAKE_SOURCE_DIR}/include/*.h )
+     ${CMAKE_SOURCE_DIR}/include/*.h
+     ${CMAKE_SOURCE_DIR}/tests/*.cpp
+     ${CMAKE_SOURCE_DIR}/tests/*.h
+)
 
 # additional target to perform cppcheck run, requires cppcheck
 
@@ -160,12 +163,11 @@ add_custom_target(
 
 # additional target to perform clang-format run, requires clang-format
 
+find_program(CLANG_FORMAT NAMES clang-format-4.0 clang-format)
 add_custom_target(
   pretty
-  COMMAND clang-format
-  -style=Google
-  -i
-  ${ALL_SOURCE_FILES}
+  COMMAND ${CLANG_FORMAT} --version
+  COMMAND ${CLANG_FORMAT} -style=file -i ${ALL_SOURCE_FILES}
 )
 
 

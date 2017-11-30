@@ -29,5 +29,4 @@ TEST(NeoPGTest, openpg_marker_packet_test) {
               "\xca\x03"
               "PGP");
   }
-
 }

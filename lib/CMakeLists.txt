@@ -40,10 +40,9 @@ add_library(libneopg
   openpgp/trust_packet.cpp
 )
 
-# On some systems, -U_GNU_SOURCE doesn't work (cmath tries to use ::isinf and fails).
 target_compile_options(libneopg
   PRIVATE
-  -fvisibility=hidden -D_POSIX_SOURCE=1 -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700
+  -fvisibility=hidden
   ${BOTAN2_CFLAGS_OTHER}
 )
 

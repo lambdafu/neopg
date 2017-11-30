@@ -107,11 +107,7 @@
 
 /* libgpg-error */
 
-#define ENABLE_NLS 1
-#define HAVE_DCGETTEXT 1
-#define HAVE_DLFCN_H 1
 #define HAVE_GCC_ATTRIBUTE_ALIGNED 1
-#define HAVE_GETTEXT 1
 #define HAVE_INTMAX_T 1
 #define HAVE_LOCALE_H 1
 #define HAVE_LONG_DOUBLE 1
@@ -178,20 +174,15 @@
 /* #undef _MINIX */
 /* #undef _POSIX_1_SOURCE */
 /* #undef _POSIX_SOURCE */
-#if defined(HAVE_W32_SYSTEM) && !defined(ENABLE_NLS)
-#define ENABLE_NLS 1
-#endif
 #define _ESTREAM_PRINTF_REALLOC _gpgrt_realloc
 #define _ESTREAM_PRINTF_EXTRA_INCLUDE "gpgrt-int.h"
 
 /* libassuan */
 
 #define HAVE_DECL_SYS_SIGLIST 1
-#define HAVE_DLFCN_H 1
 /* #undef HAVE_DOSISH_SYSTEM */
 #define HAVE_FCNTL_H 1
 #define HAVE_FOPENCOOKIE 1
-#define HAVE_FUNLOCKFILE 1
 /* #undef HAVE_FUNOPEN */
 #define HAVE_GETADDRINFO 1
 /* #undef HAVE_GETPEEREID */
@@ -231,7 +222,6 @@
 /* npth */
 
 #define HAVE_CLOCK_GETTIME 1
-#define HAVE_DLFCN_H 1
 #define HAVE_GETTIMEOFDAY 1
 #define HAVE_PSELECT 1
 #define HAVE_PTHREAD 1
@@ -282,9 +272,6 @@
 /* #undef DISABLE_REGEX */
 /* Define to include smartcard support */
 #define ENABLE_CARD_SUPPORT 1
-/* Define to 1 if translation of program messages to the user's native
-   language is requested. */
-#define ENABLE_NLS 1
 /* Define to enable SELinux support */
 /* #undef ENABLE_SELINUX_HACKS */
 /* The executable file extension, if any */
@@ -322,7 +309,6 @@
 /* #undef HAVE_BYTE_TYPEDEF */
 #define HAVE_CLOCK_GETTIME 1
 #define HAVE_CTERMID 1
-#define HAVE_DCGETTEXT 1
 #define HAVE_DECL_GETPAGESIZE 1
 #define HAVE_DECL_SYS_SIGLIST 1
 /* #undef HAVE_DIRECT_H */
@@ -334,7 +320,6 @@
 #define HAVE_FSEEKO 1
 #define HAVE_FSYNC 1
 #define HAVE_FTRUNCATE 1
-#define HAVE_FUNLOCKFILE 1
 #define HAVE_GETADDRINFO 1
 #define HAVE_GETENV 1
 #define HAVE_GETOPT_H 1
@@ -344,7 +329,6 @@
 #define HAVE_GETPWUID 1
 #define HAVE_GETRLIMIT 1
 #define HAVE_GETRUSAGE 1
-#define HAVE_GETTEXT 1
 #define HAVE_GETTIMEOFDAY 1
 #define HAVE_GMTIME_R 1
 #define HAVE_INET_NTOP 1
@@ -435,7 +419,6 @@
 #define TIME_WITH_SYS_TIME 1
 #define USE_NPTH 1
 /* #undef USE_ONLY_8DOT3 */
-/* #undef USE_SIMPLE_GETTEXT */
 /* #undef _DARWIN_C_SOURCE */
 #ifndef _DARWIN_USE_64_BIT_INODE
 # define _DARWIN_USE_64_BIT_INODE 1

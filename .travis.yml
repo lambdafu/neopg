@@ -22,22 +22,7 @@ addons:
       - libusb-1.0-0-dev
       - libbz2-dev
       - libgnutls-dev
-
-install:
-  - |
-    if [ $TRAVIS_OS_NAME = osx ]; then
-      brew update
-      brew install botan doxygen gettext lcov gcovr libusb gnutls
-      brew link --force gettext
-      # Already installed: cmake boost
-    else
-        git clone https://github.com/randombit/botan.git
-        (cd botan;
-        git checkout 2.3.0;
-        ./configure.py --with-bzip2 --with-zlib --with-sqlite3;
-        sudo make install;
-        sudo ldconfig)
-    fi;
+      - gettext
 
 matrix:
   include:
@@ -185,31 +170,34 @@ matrix:
       env:
         - CXX=clang++-5.0
 
-    - compiler: clang
-      addons:
-        apt:
-          sources:
-            - sourceline: 'ppa:samuel-bachmann/boost'
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-5.0
-          packages:
-            - *base_packages
-            - clang++-5.0
-      env:
-        - CXX=clang++-5.0
-        - CXXSTD=14
+# On Travis, this uses libstdc++4.8 and the build fails.
+#    - compiler: clang
+#      addons:
+#        apt:
+#          sources:
+#            - sourceline: 'ppa:samuel-bachmann/boost'
+#            - ubuntu-toolchain-r-test
+#            - llvm-toolchain-trusty-5.0
+#          packages:
+#            - *base_packages
+#            - clang++-5.0
+#      env:
+#        - CXX=clang++-5.0
+#        - CXXSTD=14
 
-    - os: osx
-      osx_image: xcode6.4
-      compiler: clang
-      env:
-       - CXX=clang++
+# Doesn't have thread_local.
+#    - os: osx
+#      osx_image: xcode6.4
+#      compiler: clang
+#      env:
+#       - CXX=clang++
 
-    - os: osx
-      osx_image: xcode7.3
-      compiler: clang
-      env:
-        - CXX=clang++
+# Doesn't have thread_local.
+#    - os: osx
+#      osx_image: xcode7.3
+#      compiler: clang
+#      env:
+#        - CXX=clang++
 
     - os: osx
       osx_image: xcode8.3
@@ -241,26 +229,43 @@ matrix:
         - cmake -DCMAKE_BUILD_TYPE=${NEOPG_BUILD_TYPE:-Release} ..
         - make -j3 coverage
       after_success:
-	- bash <(curl -s https://codecov.io/bash)
+        - bash <(curl -s https://codecov.io/bash)
 
     - compiler: clang
       addons:
         apt:
           sources:
-            - sourceline: 'ppa:samuel-bachmann/boost'
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-5.0
+            - llvm-toolchain-trusty-4.0
           packages:
-            - *base_packages
-            - clang++-5.0
+            - clang-format-4.0
       env:
-        - CXX=clang++-5.0
+        - PRETTY=true
+      install:
       script:
-        - $CXX --version
-        - cd build
-        - cmake -DCMAKE_BUILD_TYPE=${NEOPG_BUILD_TYPE:-Release} ..
-        - make pretty
-        - git diff --exit-code
+        - git ls-files -- '*.cpp' '*.h' | grep -v ^3rdparty | xargs clang-format-4.0 -i -style=file
+        - git diff --exit-code --color
+
+#  allow_failures:
+#    - env:
+#        - PRETTY=true
+#  fast_finish: true
+
+install:
+  - |
+    if [ $TRAVIS_OS_NAME = osx ]; then
+      brew update
+      brew install botan doxygen gettext lcov gcovr libusb gnutls
+      brew link --force gettext
+      # Already installed: cmake boost
+    else
+      git clone https://github.com/randombit/botan.git
+      (cd botan;
+      git checkout 2.3.0;
+      ./configure.py --with-bzip2 --with-zlib --with-sqlite3;
+      sudo make install;
+      sudo ldconfig)
+    fi
 
 script:
   - $CXX --version

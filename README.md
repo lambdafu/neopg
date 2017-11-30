@@ -19,22 +19,27 @@ cryptography library we want to use).
 The dependencies are also released under their respective various
 licenses.
 
+## Installation
 
-## Dependencies
+### Supported Compiler Versions
+
+* Ubuntu 14.04.5 LTS: GCC 4.9, 5, 6, 7
+* Ubuntu 14.04.5 LTS: Clang 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 5.0
+* MacOS: Xcode 6.4, 7.3, 8.3, 9.1
+
+GCC 4.8 is not supported (see [nlohmann/json](https://github.com/nlohmann/json).
+
+### Dependencies
 
 Aside from a working C++ toolchain you'll need the following libraries.
 
 1. CMake >= 3.2
-1. SQLite >= 3.0
-1. Botan >= 2.0 --with-zlib --with-bzip2
-1. Boost >= 1.64.0
-1. gettext-tools
-1. gcovr (debug builds only)
-1. clang-format (debug builds only)
-1. cppcheck (debug builds only)
-1. doxygen (debug builds only)
+2. SQLite >= 3.0
+3. Botan >= 2.0 --with-zlib --with-bzip2
+4. Boost >= 1.64.0
+5. gettext-tools
 
-## Install
+### Make
 
 With all dependencies installed NeoPG can be build with CMake.
 
@@ -42,26 +47,42 @@ With all dependencies installed NeoPG can be build with CMake.
 $ git submodule update --init
 $ mkdir build
 $ cd build
-$ cmake -DCMAKE_BUILD_TYPE=Release ..
-  # or cmake -DCMAKE_BUILD_TYPE=Release -C ../src/clang.txt ..
+$ cmake ..
 $ make
 $ make test # opt: ARGS=-V or CTEST_OUTPUT_ON_FAILURE=1
 ```
 
-## Optional
+Select your compiler and language version by setting CXX and CXXSTD
+environment variables, e.g.:
 
-You need to have `gcovr`, `clang-format`, `doxygen` and `cppcheck` installed.
-
-```
-$ make pretty
-$ make lint
+```bash
+$ CXX=clang++-5 CXXSTD=14 cmake ..
 ```
 
+### Development
+
+Development builds have extra dependencies:
+
+1. gcovr (make coverage)
+2. clang-format (make pretty)
+3. cppcheck (make lint; TODO: Replace with cmake-tidy?)
+4. doxygen (make doc)
+
+To enable a debug build, set the CMAKE_BUILD_TYPE flag (default is `Release`):
+
+```bash
+# cmake -DCMAKE_BUILD_TYPE=Debug ..
+# make coverage
 ```
-$ cmake -DCMAKE_BUILD_TYPE=Debug ..
-$ make; make coverage      # Just coverage.info for codecov.io
-$ make; make coverage-html # Local HTML report
-$ make; make coverage-data # Cobertura XML report
+
+Other targets:
+
+```
+$ make pretty        # Run clang-format on all source files
+$ make lint          # Run cppcheck
+$ make coverage      # Just coverage.info for codecov.io
+$ make coverage-html # Local HTML report
+$ make coverage-data # Cobertura XML report
 ```
 
 ## TODO
@@ -120,18 +141,6 @@ For the dependencies use a package manager like [Homebrew](https://brew.sh):
 
 ```
 $ brew install botan boost cmake doxygen gettext
-```
-
-gettext from Homebrew won't be symlinked to `/usr/local` for the build process
-to pick up the headers and libraries you need to configure the following environment
-variables: `CMAKE_INCLUDE_PATH`, `CMAKE_LIBRARY_PATH` and `CPATH`.
-
-For the default macOS shell:
-
-```
-$ export CMAKE_INCLUDE_PATH=/usr/local/opt/gettext/include
-$ export CMAKE_LIBRARY_PATH=/usr/local/opt/gettext/lib
-$ export CPATH=/usr/local/opt/gettext/include
 ```
 
 Build it!

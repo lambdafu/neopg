@@ -76,5 +76,4 @@ TEST(NeoPGTest, openpg_test) {
     packet.m_filename = std::string(256, 'A');
     ASSERT_THROW(packet.write(out), std::logic_error);
   }
-
 }

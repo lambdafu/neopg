@@ -29,7 +29,7 @@
 #endif
 #include "assuan-defs.h"
 
-static void *memrchr(const void *buffer, int c, size_t n) {
+static void *mymemrchr(const void *buffer, int c, size_t n) {
   const unsigned char *p = (const unsigned char *)buffer;
 
   for (p += n; n; n--)
@@ -92,7 +92,7 @@ static int readline(assuan_context_t ctx, char *buf, size_t buflen,
     buf += n;
     *r_nread += n;
 
-    p = (char *)memrchr(p, '\n', n);
+    p = (char *)mymemrchr(p, '\n', n);
     if (p) break; /* at least one full line available - that's enough for now */
   }
   return 0;
@@ -168,7 +168,7 @@ gpg_error_t _assuan_read_line(assuan_context_t ctx) {
     {
       int len = nread - n;
       memcpy(ctx->inbound.attic.line, endp + 1, len);
-      ctx->inbound.attic.pending = memrchr(endp + 1, '\n', len) ? 1 : 0;
+      ctx->inbound.attic.pending = mymemrchr(endp + 1, '\n', len) ? 1 : 0;
       ctx->inbound.attic.linelen = len;
     }
 
