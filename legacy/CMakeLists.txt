@@ -241,7 +241,6 @@ add_library(gcrypt
   libgcrypt/mpi/generic/mpih-mul3.cpp
   libgcrypt/mpi/generic/mpih-rshift.cpp
   libgcrypt/mpi/generic/mpih-sub1.cpp
-  libgcrypt/mpi/generic/udiv-w-sdiv.cpp
   libgcrypt/random/random.cpp
 )
 add_library(neopg::gcrypt ALIAS gcrypt)
