@@ -378,7 +378,7 @@ gpg_error_t agent_listtrusted(void *assuan_context) {
   gpg_error_t err;
   size_t len;
   std::lock_guard<std::mutex> lock(trusttable_lock);
-  
+
   if (!trusttable) {
     err = read_trustfiles();
     if (err) {

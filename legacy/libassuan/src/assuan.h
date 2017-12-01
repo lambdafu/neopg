@@ -505,7 +505,6 @@ int __assuan_sendmsg(assuan_context_t ctx, assuan_fd_t fd,
 pid_t __assuan_waitpid(assuan_context_t ctx, pid_t pid, int nowait, int *status,
                        int options);
 
-
 #ifdef __cplusplus
 }
 #endif

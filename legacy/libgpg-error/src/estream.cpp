@@ -840,8 +840,8 @@ static struct cookie_io_functions_s estream_functions_fd = {
 
 /* Cookie for fd objects.  */
 typedef struct estream_cookie_w32 {
-  HANDLE hd;            /* The handle we are using for actual output.  */
-  int no_close;         /* If set we won't close the handle.  */
+  HANDLE hd;    /* The handle we are using for actual output.  */
+  int no_close; /* If set we won't close the handle.  */
 } * estream_cookie_w32_t;
 
 /*

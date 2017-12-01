@@ -24,10 +24,10 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
 #include <unistd.h>
 
 /* If requested include the definitions for the remote APDU protocol
@@ -130,14 +130,11 @@ static int lock_slot(int slot) {
 }
 
 static int trylock_slot(int slot) {
-  if (!reader_table[slot].lock.try_lock())
-    return SW_HOST_BUSY;
+  if (!reader_table[slot].lock.try_lock()) return SW_HOST_BUSY;
   return 0;
 }
 
-static void unlock_slot(int slot) {
-  reader_table[slot].lock.unlock();
-}
+static void unlock_slot(int slot) { reader_table[slot].lock.unlock(); }
 
 /* Find an unused reader slot for PORTSTR and put it into the reader
    table.  Return -1 on error or the index into the reader table.

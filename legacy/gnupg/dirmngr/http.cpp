@@ -2058,7 +2058,7 @@ static gpgrt_ssize_t read_server(assuan_fd_t sock, void *buffer, size_t size) {
 
   do {
 #ifdef HAVE_W32_SYSTEM
-/* Under Windows we need to use recv for a socket.  */
+    /* Under Windows we need to use recv for a socket.  */
     nread = recv(FD2INT(sock), buffer, size, 0);
 
 #else /*!HAVE_W32_SYSTEM*/
@@ -2084,7 +2084,7 @@ static gpg_error_t write_server(assuan_fd_t sock, const char *data,
       log_info("network write failed: ec=%d\n", (int)WSAGetLastError());
       return GPG_ERR_NETWORK;
     }
-#else /*!HAVE_W32_SYSTEM*/
+#else  /*!HAVE_W32_SYSTEM*/
     nwritten = write(sock, data, nleft);
     if (nwritten == -1) {
       if (errno == EINTR) continue;

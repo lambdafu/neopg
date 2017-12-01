@@ -50,16 +50,16 @@ struct app_ctx_s {
   int slot{0};
 
   unsigned char *serialno{nullptr}; /* Serialnumber in raw form, allocated. */
-  size_t serialnolen{0};      /* Length in octets of serialnumber. */
+  size_t serialnolen{0};            /* Length in octets of serialnumber. */
   const char *apptype{nullptr};
   unsigned int card_version{0};
   unsigned int card_status{0};
-  unsigned int reset_requested {0};
-  unsigned int periodical_check_needed {0};
-  unsigned int did_chv1 {0};
-  unsigned int force_chv1 {0}; /* True if the card does not cache CHV1. */
-  unsigned int did_chv2 {0};
-  unsigned int did_chv3 {0};
+  unsigned int reset_requested{0};
+  unsigned int periodical_check_needed{0};
+  unsigned int did_chv1{0};
+  unsigned int force_chv1{0}; /* True if the card does not cache CHV1. */
+  unsigned int did_chv2{0};
+  unsigned int did_chv3{0};
   struct app_local_s *app_local{nullptr}; /* Local to the application. */
   struct {
     void (*deinit)(app_t app);
@@ -107,7 +107,8 @@ struct app_ctx_s {
                              gpg_error_t (*pincb)(void *, const char *,
                                                   char **),
                              void *pincb_arg);
-  } fnc{nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr};
+  } fnc{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 };
 
 /*-- app-help.c --*/

@@ -864,9 +864,9 @@ static char *get_escaped_usb_string(libusb_device_handle *idev, int idx,
      for USB IOCTLs. */
   memset(buf, 0, sizeof buf);
 
-/* First get the list of supported languages and use the first one.
-   If we do don't find it we try to use English.  Note that this is
-   all in a 2 bute Unicode encoding using little endian. */
+  /* First get the list of supported languages and use the first one.
+     If we do don't find it we try to use English.  Note that this is
+     all in a 2 bute Unicode encoding using little endian. */
   rc = libusb_control_transfer(idev, LIBUSB_ENDPOINT_IN,
                                LIBUSB_REQUEST_GET_DESCRIPTOR,
                                (LIBUSB_DT_STRING << 8), 0, (unsigned char *)buf,
@@ -1765,9 +1765,9 @@ static int abort_cmd(ccid_driver_t handle, int seqno) {
 
   seqno &= 0xff;
   DEBUGOUT_1("sending abort sequence for seqno %d\n", seqno);
-/* Send the abort command to the control pipe.  Note that we don't
-   need to keep track of sent abort commands because there should
-   never be another thread using the same slot concurrently.  */
+  /* Send the abort command to the control pipe.  Note that we don't
+     need to keep track of sent abort commands because there should
+     never be another thread using the same slot concurrently.  */
   rc = libusb_control_transfer(
       handle->idev, 0x21, /* bmRequestType: host-to-device,
                              class specific, to interface.  */

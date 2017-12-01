@@ -132,7 +132,7 @@ static gpg_error_t app_new_register(int slot, ctrl_t ctrl, const char *name,
 
   err = lock_app(app, ctrl);
   if (err) {
-    delete(app);
+    delete (app);
     return err;
   }
 
@@ -200,7 +200,7 @@ leave:
     else
       log_info("no supported card application found: %s\n", gpg_strerror(err));
     unlock_app(app);
-    delete(app);
+    delete (app);
     return err;
   }
 
@@ -338,7 +338,7 @@ static void deallocate_app(app_t app) {
   xfree(app->serialno);
 
   unlock_app(app);
-  delete(app);
+  delete (app);
 }
 
 /* Free the resources associated with the application APP.  APP is

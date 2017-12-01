@@ -75,15 +75,13 @@ struct entry_parm_s {
 /* This function may be called to print information pertaining to the
    current state of this module to the log. */
 void agent_query_dump_state(void) {
-  log_info("agent_query_dump_state: entry_ctx=%p pid=%ld\n",
-           entry_ctx, (long)assuan_get_pid(entry_ctx));
+  log_info("agent_query_dump_state: entry_ctx=%p pid=%ld\n", entry_ctx,
+           (long)assuan_get_pid(entry_ctx));
 }
 
 /* Called to make sure that a popup window owned by the current
    connection gets closed. */
-void agent_reset_query(ctrl_t ctrl) {
-}
-
+void agent_reset_query(ctrl_t ctrl) {}
 
 /* Call the Entry and ask for the PIN.  We do check for a valid PIN
    number here and repeat it as long as we have invalid formed
@@ -131,7 +129,6 @@ int agent_get_passphrase(ctrl_t ctrl, char **retpass, const char *desc,
     return pinentry_loopback(ctrl, "PASSPHRASE", (unsigned char **)retpass,
                              &size, MAX_PASSPHRASE_LEN);
   }
-
 }
 
 /* Pop up the PIN-entry, display the text and the prompt and ask the
@@ -166,8 +163,7 @@ int agent_popup_message_start(ctrl_t ctrl, const char *desc,
 }
 
 /* Close a popup window. */
-void agent_popup_message_stop(ctrl_t ctrl) {
-}
+void agent_popup_message_stop(ctrl_t ctrl) {}
 
 int agent_clear_passphrase(ctrl_t ctrl, const char *keyinfo,
                            cache_mode_t cache_mode) {

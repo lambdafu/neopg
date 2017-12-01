@@ -559,22 +559,23 @@ void cert_cache_init(const std::vector<std::string> &hkp_cacerts) {
   {
     std::lock_guard<std::mutex> lock(cache_lock);
     load_certs_from_system();
-    
+
     fname = make_filename_try(gnupg_sysconfdir(), "trusted-certs", NULL);
     if (fname) load_certs_from_dir(fname, CERTTRUST_CLASS_CONFIG);
     xfree(fname);
-    
+
     fname = make_filename_try(gnupg_sysconfdir(), "extra-certs", NULL);
     if (fname) load_certs_from_dir(fname, 0);
     xfree(fname);
-    
-    fname = make_filename_try(gnupg_datadir(), "sks-keyservers.netCA.pem", NULL);
+
+    fname =
+        make_filename_try(gnupg_datadir(), "sks-keyservers.netCA.pem", NULL);
     if (fname) load_certs_from_file(fname, CERTTRUST_CLASS_HKPSPOOL, 1);
     xfree(fname);
-    
+
     for (auto cacert : hkp_cacerts)
       load_certs_from_file(cacert.c_str(), CERTTRUST_CLASS_HKP, 0);
-    
+
     initialization_done = 1;
   }
 
@@ -589,7 +590,7 @@ void cert_cache_deinit(int full) {
 
   if (!initialization_done) return;
 
-    std::lock_guard<std::mutex> lock(cache_lock);
+  std::lock_guard<std::mutex> lock(cache_lock);
 
   for (i = 0; i < 256; i++)
     for (ci = cert_cache[i]; ci; ci = ci->next) clean_cache_slot(ci);
