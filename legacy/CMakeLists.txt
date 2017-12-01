@@ -15,7 +15,6 @@ add_library(gpg-error
   libgpg-error/src/estream.cpp
   libgpg-error/src/estream-printf.cpp
   libgpg-error/src/gpg-error.h
-  libgpg-error/src/gpgrt.h
   libgpg-error/src/gpgrt-int.h
   libgpg-error/src/init.cpp
   libgpg-error/src/visibility.h

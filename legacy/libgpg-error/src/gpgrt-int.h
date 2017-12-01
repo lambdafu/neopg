@@ -127,11 +127,6 @@ void _gpgrt_get_syscall_clamp(void (**r_pre)(void), void (**r_post)(void));
 
 gpgrt_stream_t _gpgrt_fopen(const char *_GPGRT__RESTRICT path,
                             const char *_GPGRT__RESTRICT mode);
-gpgrt_stream_t _gpgrt_mopen(void *_GPGRT__RESTRICT data, size_t data_n,
-                            size_t data_len, unsigned int grow,
-                            void *(*func_realloc)(void *mem, size_t size),
-                            void (*func_free)(void *mem),
-                            const char *_GPGRT__RESTRICT mode);
 gpgrt_stream_t _gpgrt_fopenmem(size_t memlimit,
                                const char *_GPGRT__RESTRICT mode);
 gpgrt_stream_t _gpgrt_fopenmem_init(size_t memlimit,

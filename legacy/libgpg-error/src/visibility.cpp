@@ -44,15 +44,6 @@ estream_t gpgrt_fopen(const char *_GPGRT__RESTRICT path,
   return _gpgrt_fopen(path, mode);
 }
 
-estream_t gpgrt_mopen(void *_GPGRT__RESTRICT data, size_t data_n,
-                      size_t data_len, unsigned int grow,
-                      void *(*func_realloc)(void *mem, size_t size),
-                      void (*func_free)(void *mem),
-                      const char *_GPGRT__RESTRICT mode) {
-  return _gpgrt_mopen(data, data_n, data_len, grow, func_realloc, func_free,
-                      mode);
-}
-
 estream_t gpgrt_fopenmem(size_t memlimit, const char *_GPGRT__RESTRICT mode) {
   return _gpgrt_fopenmem(memlimit, mode);
 }
@@ -296,11 +287,6 @@ int gpgrt_snprintf(char *buf, size_t bufsize, const char *format, ...) {
   va_end(arg_ptr);
 
   return rc;
-}
-
-int gpgrt_vsnprintf(char *buf, size_t bufsize, const char *format,
-                    va_list arg_ptr) {
-  return _gpgrt_estream_vsnprintf(buf, bufsize, format, arg_ptr);
 }
 
 #include <string.h>

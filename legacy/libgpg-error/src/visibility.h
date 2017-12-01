@@ -45,7 +45,6 @@
 #define gpg_err_set_errno _gpgrt_USE_UNDERSCORED_FUNCTION
 
 #define gpgrt_fopen _gpgrt_USE_UNDERSCORED_FUNCTION
-#define gpgrt_mopen _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_fopenmem _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_fopenmem_init _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_fdopen _gpgrt_USE_UNDERSCORED_FUNCTION
@@ -98,7 +97,6 @@
 #define gpgrt_asprintf _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_vasprintf _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_snprintf _gpgrt_USE_UNDERSCORED_FUNCTION
-#define gpgrt_vsnprintf _gpgrt_USE_UNDERSCORED_FUNCTION
 
 #define gpgrt_set_syscall_clamp _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_get_syscall_clamp _gpgrt_USE_UNDERSCORED_FUNCTION

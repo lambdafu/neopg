@@ -865,11 +865,6 @@ typedef struct _gpgrt_syshd es_syshd_t;
 
 gpgrt_stream_t gpgrt_fopen(const char *_GPGRT__RESTRICT path,
                            const char *_GPGRT__RESTRICT mode);
-gpgrt_stream_t gpgrt_mopen(void *_GPGRT__RESTRICT data, size_t data_n,
-                           size_t data_len, unsigned int grow,
-                           void *(*func_realloc)(void *mem, size_t size),
-                           void (*func_free)(void *mem),
-                           const char *_GPGRT__RESTRICT mode);
 gpgrt_stream_t gpgrt_fopenmem(size_t memlimit,
                               const char *_GPGRT__RESTRICT mode);
 gpgrt_stream_t gpgrt_fopenmem_init(size_t memlimit,
@@ -997,12 +992,8 @@ int gpgrt_vasprintf(char **r_buf, const char *_GPGRT__RESTRICT format,
 int gpgrt_snprintf(char *buf, size_t bufsize,
                    const char *_GPGRT__RESTRICT format, ...)
     GPGRT_ATTR_PRINTF(3, 4);
-int gpgrt_vsnprintf(char *buf, size_t bufsize,
-                    const char *_GPGRT__RESTRICT format, va_list arg_ptr)
-    GPGRT_ATTR_PRINTF(3, 0);
 
 #define es_fopen gpgrt_fopen
-#define es_mopen gpgrt_mopen
 #define es_fopenmem gpgrt_fopenmem
 #define es_fopenmem_init gpgrt_fopenmem_init
 #define es_fdopen gpgrt_fdopen

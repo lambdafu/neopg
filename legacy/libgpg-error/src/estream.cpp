@@ -2451,52 +2451,6 @@ out:
   return stream;
 }
 
-/* Create a new estream object in memory.  If DATA is not NULL this
-   buffer will be used as the memory buffer; thus after this functions
-   returns with the success the the memory at DATA belongs to the new
-   estream.  The allocated length of DATA is given by DATA_LEN and its
-   used length by DATA_N.  Usually this is malloced buffer; if a
-   static buffer is provided, the caller must pass false for GROW and
-   provide a dummy function for FUNC_FREE.  FUNC_FREE and FUNC_REALLOC
-   allow the caller to provide custom functions for realloc and free
-   to be used by the new estream object.  Note that the realloc
-   function is also used for initial allocation.  If DATA is NULL a
-   buffer is internally allocated; either using internal function or
-   those provide by the caller.  It is an error to provide a realloc
-   function but no free function.  Providing only a free function is
-   allowed as long as GROW is false.  */
-estream_t _gpgrt_mopen(void *_GPGRT__RESTRICT data, size_t data_n,
-                       size_t data_len, unsigned int grow,
-                       func_realloc_t func_realloc, func_free_t func_free,
-                       const char *_GPGRT__RESTRICT mode) {
-  int create_called = 0;
-  estream_t stream = NULL;
-  void *cookie = NULL;
-  unsigned int modeflags, xmode;
-  int err;
-  es_syshd_t syshd;
-
-  err = parse_mode(mode, &modeflags, &xmode, NULL);
-  if (err) goto out;
-
-  err = func_mem_create(&cookie, (unsigned char *)(data), data_n, data_len,
-                        BUFFER_BLOCK_SIZE, grow, func_realloc, func_free,
-                        modeflags, 0);
-  if (err) goto out;
-
-  memset(&syshd, 0, sizeof syshd);
-  create_called = 1;
-  err = create_stream(&stream, cookie, &syshd, BACKEND_MEM,
-                      estream_functions_mem, modeflags, xmode, 0);
-
-out:
-
-  if (err && create_called)
-    (*estream_functions_mem.public_x.func_close)(cookie);
-
-  return stream;
-}
-
 estream_t _gpgrt_fopenmem(size_t memlimit, const char *_GPGRT__RESTRICT mode) {
   unsigned int modeflags, xmode;
   estream_t stream = NULL;
@@ -3256,76 +3210,6 @@ int _gpgrt_fprintf(estream_t _GPGRT__RESTRICT stream,
   va_end(ap);
 
   return ret;
-}
-
-static int tmpfd(void) {
-#ifdef HAVE_W32_SYSTEM
-  int attempts, n;
-  char buffer[MAX_PATH + 9 + 12 + 1];
-#define mystrlen(a) strlen(a)
-  char *name, *p;
-  HANDLE file;
-  int pid = GetCurrentProcessId();
-  unsigned int value;
-  int i;
-
-  n = GetTempPath(MAX_PATH + 1, buffer);
-  if (!n || n > MAX_PATH || mystrlen(buffer) > MAX_PATH) {
-    _set_errno(ENOENT);
-    return -1;
-  }
-  p = buffer + mystrlen(buffer);
-  strcpy(p, "_estream");
-  p += 8;
-  /* We try to create the directory but don't care about an error as
-     it may already exist and the CreateFile would throw an error
-     anyway.  */
-  CreateDirectory(buffer, NULL);
-  *p++ = '\\';
-  name = p;
-  for (attempts = 0; attempts < 10; attempts++) {
-    p = name;
-    value = (GetTickCount() ^ ((pid << 16) & 0xffff0000));
-    for (i = 0; i < 8; i++) {
-      *p++ = tohex(((value >> 28) & 0x0f));
-      value <<= 4;
-    }
-    strcpy(p, ".tmp");
-    file =
-        CreateFile(buffer, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                   FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
-    if (file != INVALID_HANDLE_VALUE) {
-      int fd = _open_osfhandle((long)file, 0);
-      if (fd == -1) {
-        CloseHandle(file);
-        return -1;
-      }
-      return fd;
-    }
-    Sleep(1); /* One ms as this is the granularity of GetTickCount.  */
-  }
-  _set_errno(ENOENT);
-  return -1;
-#else  /*!HAVE_W32_SYSTEM*/
-  FILE *fp;
-  int fp_fd;
-  int fd;
-
-  fp = NULL;
-  fd = -1;
-
-  fp = tmpfile();
-  if (!fp) goto out;
-
-  fp_fd = fileno(fp);
-  fd = dup(fp_fd);
-
-out:
-
-  if (fp) fclose(fp);
-
-  return fd;
-#endif /*!HAVE_W32_SYSTEM*/
 }
 
 int _gpgrt_setvbuf(estream_t _GPGRT__RESTRICT stream,
