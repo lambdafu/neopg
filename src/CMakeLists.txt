@@ -215,7 +215,6 @@ target_include_directories(neopg PRIVATE
   ../legacy/libgpg-error/src
   ../legacy/libassuan/src
   ../legacy/libgcrypt/src
-  ../legacy/npth/src
   ../legacy/libksba/src
   ${CMAKE_BINARY_DIR}/.
   ${Boost_INCLUDE_DIR}
@@ -236,7 +235,6 @@ target_link_libraries(neopg PRIVATE
   gpg-error
   assuan
   gcrypt
-  npth
   ksba
 ${Boost_LIBRARIES}
 ${SQLITE3_LDFLAGS} ${SQLITE3_LIBRARIES}

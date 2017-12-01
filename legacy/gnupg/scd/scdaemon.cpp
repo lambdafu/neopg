@@ -33,7 +33,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #endif /*HAVE_W32_SYSTEM*/
-#include <npth.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -72,7 +71,6 @@ enum cmd_and_opt_values {
   oDebugWait,
   oDebugAllowCoreDump,
   oDebugCCIDDriver,
-  oDebugLogTid,
   oDebugAssuanLogCats,
   oNoGreeting,
   oNoOptions,
@@ -106,7 +104,6 @@ static ARGPARSE_OPTS opts[] = {
     ARGPARSE_s_i(oDebugWait, "debug-wait", "@"),
     ARGPARSE_s_n(oDebugAllowCoreDump, "debug-allow-core-dump", "@"),
     ARGPARSE_s_n(oDebugCCIDDriver, "debug-ccid-driver", "@"),
-    ARGPARSE_s_n(oDebugLogTid, "debug-log-tid", "@"),
     ARGPARSE_p_u(oDebugAssuanLogCats, "debug-assuan-log-cats", "@"),
     ARGPARSE_s_n(oNoDetach, "no-detach", N_("do not detach from the console")),
     ARGPARSE_s_s(oLogFile, "log-file", N_("|FILE|write a log to FILE")),
@@ -151,9 +148,7 @@ static struct debug_flags_s debug_flags[] = {
    This is not too good for power saving but given that there is no
    easy way to block on card status changes it is the best we can do.
    For PC/SC we could in theory use an extra thread to wait for status
-   changes but that requires a native thread because there is no way
-   to make the underlying PC/SC card change function block using a Npth
-   mechanism.  Given that a native thread could only be used under W32
+   changes.  Given that a native thread could only be used under W32
    we don't do that at all.  */
 #define TIMERTICK_INTERVAL_SEC (0)
 #define TIMERTICK_INTERVAL_USEC (500000)
@@ -208,17 +203,6 @@ static const char *my_strusage(int level) {
       p = NULL;
   }
   return p;
-}
-
-static int tid_log_callback(unsigned long *rvalue) {
-  int len = sizeof(*rvalue);
-  npth_t thread;
-
-  thread = npth_self();
-  if (sizeof(thread) < len) len = sizeof(thread);
-  memcpy(rvalue, &thread, len);
-
-  return 2; /* Use use hex representation.  */
 }
 
 /* Setup the debugging.  With a LEVEL of NULL only the active debug
@@ -290,7 +274,6 @@ int scd_main(int argc, char **argv) {
   int allow_coredump = 0;
   struct assuan_malloc_hooks malloc_hooks;
   int res;
-  npth_t pipecon_handler;
 
   early_system_init();
   set_strusage(my_strusage);
@@ -306,7 +289,6 @@ int scd_main(int argc, char **argv) {
   malloc_hooks.realloc = gcry_realloc;
   malloc_hooks.free = gcry_free;
   assuan_set_malloc_hooks(&malloc_hooks);
-  assuan_set_system_hooks(ASSUAN_SYSTEM_NPTH);
   assuan_sock_init();
   setup_libassuan_logging(&opt.debug, NULL);
 
@@ -408,9 +390,6 @@ next_pass:
         ccid_set_debug_level(ccid_set_debug_level(-1) + 1);
 #endif /*HAVE_LIBUSB*/
         break;
-      case oDebugLogTid:
-        log_set_pid_suffix_cb(tid_log_callback);
-        break;
       case oDebugAssuanLogCats:
         set_libassuan_log_cats(pargs.r.ret_ulong);
         break;
@@ -497,11 +476,6 @@ next_pass:
 
   set_debug(debug_level);
 
-  if (initialize_module_command()) {
-    log_error("initialization failed\n");
-    exit(1);
-  }
-
   /* Now start with logging to a file if this is desired.  */
   if (logfile) {
     log_set_file(logfile);
@@ -519,7 +493,6 @@ next_pass:
   {
     /* This is the simple pipe based server */
     ctrl_t ctrl;
-    npth_attr_t tattr;
     int fd = -1;
 
 #ifndef HAVE_W32_SYSTEM
@@ -533,9 +506,6 @@ next_pass:
     }
 #endif
 
-    npth_init();
-    gpgrt_set_syscall_clamp(npth_unprotect, npth_protect);
-
     /* If --debug-allow-core-dump has been given we also need to
        switch the working directory to a place where we can actually
        write. */
@@ -545,13 +515,6 @@ next_pass:
       else
         log_debug("changed working directory to '/tmp'\n");
     }
-
-    res = npth_attr_init(&tattr);
-    if (res) {
-      log_error("error allocating thread attributes: %s\n", strerror(res));
-      scd_exit(2);
-    }
-    npth_attr_setdetachstate(&tattr, NPTH_CREATE_DETACHED);
 
     ctrl = (ctrl_t)xtrycalloc(1, sizeof *ctrl);
     if (!ctrl) {

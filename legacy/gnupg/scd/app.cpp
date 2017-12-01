@@ -18,8 +18,10 @@
  */
 
 #include <config.h>
+
+#include <mutex>
+
 #include <errno.h>
-#include <npth.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +33,7 @@
 #include "iso7816.h"
 #include "scdaemon.h"
 
-static npth_mutex_t app_list_lock;
+static std::mutex app_list_lock;
 static app_t app_top;
 
 static void print_progress_line(void *opaque, const char *what, int pc, int cur,
@@ -53,27 +55,15 @@ static void print_progress_line(void *opaque, const char *what, int pc, int cur,
    success; only then the unlock_reader function must be called after
    returning from the handler. */
 static gpg_error_t lock_app(app_t app, ctrl_t ctrl) {
-  if (npth_mutex_lock(&app->lock)) {
-    gpg_error_t err = gpg_error_from_syserror();
-    log_error("failed to acquire APP lock for %p: %s\n", app,
-              gpg_strerror(err));
-    return err;
-  }
-
+  app->lock.lock();
   apdu_set_progress_cb(app->slot, print_progress_line, ctrl);
-
   return 0;
 }
 
 /* Release a lock on the reader.  See lock_reader(). */
 static void unlock_app(app_t app) {
   apdu_set_progress_cb(app->slot, NULL, NULL);
-
-  if (npth_mutex_unlock(&app->lock)) {
-    gpg_error_t err = gpg_error_from_syserror();
-    log_error("failed to release APP lock for %p: %s\n", app,
-              gpg_strerror(err));
-  }
+  app->lock.unlock();
 }
 
 /* This function may be called to print information pertaining to the
@@ -81,10 +71,9 @@ static void unlock_app(app_t app) {
 void app_dump_state(void) {
   app_t a;
 
-  npth_mutex_lock(&app_list_lock);
+  std::lock_guard<std::mutex> lock(app_list_lock);
   for (a = app_top; a; a = a->next)
     log_info("app_dump_state: app=%p type='%s'\n", a, a->apptype);
-  npth_mutex_unlock(&app_list_lock);
 }
 
 static gpg_error_t check_conflict(app_t app, const char *name) {
@@ -137,26 +126,13 @@ static gpg_error_t app_new_register(int slot, ctrl_t ctrl, const char *name,
   int want_undefined;
 
   /* Need to allocate a new one.  */
-  app = (app_t)xtrycalloc(1, sizeof *app);
-  if (!app) {
-    err = gpg_error_from_syserror();
-    log_info("error allocating context: %s\n", gpg_strerror(err));
-    return err;
-  }
-
+  app = new app_ctx_s;
   app->slot = slot;
   app->card_status = (unsigned int)-1;
 
-  if (npth_mutex_init(&app->lock, NULL)) {
-    err = gpg_error_from_syserror();
-    log_error("error initializing mutex: %s\n", gpg_strerror(err));
-    xfree(app);
-    return err;
-  }
-
   err = lock_app(app, ctrl);
   if (err) {
-    xfree(app);
+    delete(app);
     return err;
   }
 
@@ -224,16 +200,17 @@ leave:
     else
       log_info("no supported card application found: %s\n", gpg_strerror(err));
     unlock_app(app);
-    xfree(app);
+    delete(app);
     return err;
   }
 
   app->periodical_check_needed = periodical_check_needed;
 
-  npth_mutex_lock(&app_list_lock);
-  app->next = app_top;
-  app_top = app;
-  npth_mutex_unlock(&app_list_lock);
+  {
+    std::lock_guard<std::mutex> lock(app_list_lock);
+    app->next = app_top;
+    app_top = app;
+  }
   unlock_app(app);
   return 0;
 }
@@ -284,7 +261,7 @@ gpg_error_t select_application(ctrl_t ctrl, const char *name, app_t *r_app,
     if (periodical_check_needed) scd_kick_the_loop();
   }
 
-  npth_mutex_lock(&app_list_lock);
+  std::lock_guard<std::mutex> lock(app_list_lock);
   for (a = app_top; a; a = a->next) {
     lock_app(a, ctrl);
     if (serialno_bin == NULL) break;
@@ -309,8 +286,6 @@ gpg_error_t select_application(ctrl_t ctrl, const char *name, app_t *r_app,
     unlock_app(a);
   } else
     err = GPG_ERR_ENODEV;
-
-  npth_mutex_unlock(&app_list_lock);
 
   return err;
 }
@@ -363,7 +338,7 @@ static void deallocate_app(app_t app) {
   xfree(app->serialno);
 
   unlock_app(app);
-  xfree(app);
+  delete(app);
 }
 
 /* Free the resources associated with the application APP.  APP is
@@ -794,7 +769,7 @@ int scd_update_reader_status_file(void) {
   app_t a, app_next;
   int periodical_check_needed = 0;
 
-  npth_mutex_lock(&app_list_lock);
+  std::lock_guard<std::mutex> lock(app_list_lock);
   for (a = app_top; a; a = app_next) {
     int sw;
     unsigned int status;
@@ -835,37 +810,19 @@ int scd_update_reader_status_file(void) {
       unlock_app(a);
     }
   }
-  npth_mutex_unlock(&app_list_lock);
 
   return periodical_check_needed;
-}
-
-/* This function must be called once to initialize this module.  This
-   has to be done before a second thread is spawned.  We can't do the
-   static initialization because Pth emulation code might not be able
-   to do a static init; in particular, it is not possible for W32. */
-gpg_error_t initialize_module_command(void) {
-  gpg_error_t err;
-
-  if (npth_mutex_init(&app_list_lock, NULL)) {
-    err = gpg_error_from_syserror();
-    log_error("app: error initializing mutex: %s\n", gpg_strerror(err));
-    return err;
-  }
-
-  return apdu_init();
 }
 
 void app_send_card_list(ctrl_t ctrl) {
   app_t a;
   char buf[65];
 
-  npth_mutex_lock(&app_list_lock);
+  std::lock_guard<std::mutex> lock(app_list_lock);
   for (a = app_top; a; a = a->next) {
     if (DIM(buf) < 2 * a->serialnolen + 1) continue;
 
     bin2hex(a->serialno, a->serialnolen, buf);
     send_status_direct(ctrl, "SERIALNO", buf);
   }
-  npth_mutex_unlock(&app_list_lock);
 }

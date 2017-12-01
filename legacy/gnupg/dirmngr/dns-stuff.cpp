@@ -63,29 +63,17 @@
  * be wrong for dns.c allocated data.  */
 #define dns_free(a) free((a))
 
-#ifdef WITHOUT_NPTH /* Give the Makefile a chance to build without Pth.  */
-#undef USE_NPTH
-#endif
-#ifdef USE_NPTH
-#include <npth.h>
-#endif
-
 #include <gpg-error.h>
 #include "../common/host2net.h"
 #include "../common/util.h"
 #include "dns-stuff.h"
 
-#ifdef USE_NPTH
-#define my_unprotect() npth_unprotect()
-#define my_protect() npth_protect()
-#else
 #define my_unprotect() \
   do {                 \
   } while (0)
 #define my_protect() \
   do {               \
   } while (0)
-#endif
 
 /* We allow the use of 0 instead of AF_UNSPEC - check this assumption.  */
 #if AF_UNSPEC != 0

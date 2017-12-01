@@ -93,8 +93,6 @@
 
 /*-- src/global.c -*/
 gpg_error_t _gcry_vcontrol(enum gcry_ctl_cmds cmd, va_list arg_ptr);
-void _gcry_pre_syscall(void);
-void _gcry_post_syscall(void);
 int _gcry_get_debug_flag(unsigned int mask);
 
 char *_gcry_get_config(int mode, const char *what);

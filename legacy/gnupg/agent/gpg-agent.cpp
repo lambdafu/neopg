@@ -40,7 +40,6 @@
 #include <aclapi.h>
 #include <sddl.h>
 #endif /*!HAVE_W32_SYSTEM*/
-#include <npth.h>
 #include <unistd.h>
 
 #define GNUPG_COMMON_NEED_AFLOCAL
@@ -154,29 +153,6 @@ static struct debug_flags_s debug_flags[] = {
 #define MIN_PASSPHRASE_NONALPHA (1)
 #define MAX_PASSPHRASE_DAYS (0)
 
-/* The timer tick used for housekeeping stuff.  For Windows we use a
-   longer period as the SetWaitableTimer seems to signal earlier than
-   the 2 seconds.  CHECK_OWN_SOCKET_INTERVAL defines how often we
-   check our own socket in standard socket mode.  If that value is 0
-   we don't check at all.   All values are in seconds. */
-#if defined(HAVE_W32_SYSTEM)
-#define TIMERTICK_INTERVAL (4)
-#else
-#define TIMERTICK_INTERVAL (2)
-#endif
-
-/* Flag to indicate that a shutdown was requested.  */
-static int shutdown_pending;
-
-/* Counter for the currently running own socket checks.  */
-static int check_own_socket_running;
-
-/* Flag indicating that we are in supervised mode.  */
-static int is_supervised;
-
-/* Flag to inhibit socket removal in cleanup.  */
-static int inhibit_socket_removal;
-
 /* Default values for options passed to the pinentry. */
 static char *default_lc_ctype;
 static char *default_lc_messages;
@@ -191,36 +167,6 @@ static const char *debug_level;
    the log file after a SIGHUP if it didn't changed. Malloced. */
 static char *current_logfile;
 
-/* The handle_tick() function may test whether a parent is still
-   running.  We record the PID of the parent here or -1 if it should be
-   watched. */
-static pid_t parent_pid = (pid_t)(-1);
-
-/* Number of active connections.  */
-static int active_connections;
-
-/* This object is used to dispatch progress messages from Libgcrypt to
- * the right thread.  Given that we will have at max only a few dozen
- * connections at a time, using a linked list is the easiest way to
- * handle this. */
-struct progress_dispatch_s {
-  struct progress_dispatch_s *next;
-  /* The control object of the connection.  If this is NULL no
-   * connection is associated with this item and it is free for reuse
-   * by new connections.  */
-  ctrl_t ctrl;
-
-  /* The thread id of (npth_self) of the connection.  */
-  npth_t tid;
-
-  /* The callback set by the connection.  This is similar to the
-   * Libgcrypt callback but with the control object passed as the
-   * first argument.  */
-  void (*cb)(ctrl_t ctrl, const char *what, int printchar, int current,
-             int total);
-};
-struct progress_dispatch_s *progress_dispatch_list;
-
 /*
    Local prototypes.
  */
@@ -229,9 +175,6 @@ static void create_directories(void);
 
 static void agent_init_default_ctrl(ctrl_t ctrl);
 static void agent_deinit_default_ctrl(ctrl_t ctrl);
-
-/* Pth wrapper function definitions. */
-ASSUAN_SYSTEM_NPTH_IMPL;
 
 /* Return strings describing this program.  The case values are
    described in common/argparse.c:strusage.  The values here override
@@ -419,33 +362,6 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
 /* Fixup some options after all have been processed.  */
 static void finalize_rereadable_options(void) {}
 
-static void thread_init_once(void) {
-  static int npth_initialized = 0;
-
-  if (!npth_initialized) {
-    npth_initialized++;
-    npth_init();
-  }
-  gpgrt_set_syscall_clamp(npth_unprotect, npth_protect);
-/* Now that we have set the syscall clamp we need to tell Libgcrypt
- * that it should get them from libgpg-error.  Note that Libgcrypt
- * has already been initialized but at that point nPth was not
- * initialized and thus Libgcrypt could not set its system call
- * clamp.  */
-#if GCRYPT_VERSION_NUMBER >= 0x010800 /* 1.8.0 */
-  gcry_control(GCRYCTL_REINIT_SYSCALL_CLAMP, 0, 0);
-#endif
-}
-
-static void initialize_modules(void) {
-  thread_init_once();
-  assuan_set_system_hooks(ASSUAN_SYSTEM_NPTH);
-  initialize_module_cache();
-  initialize_module_call_pinentry();
-  initialize_module_call_scd();
-  initialize_module_trustlist();
-}
-
 /* The main entry point.  */
 int agent_main(int argc, char **argv) {
   ARGPARSE_ARGS pargs;
@@ -458,7 +374,6 @@ int agent_main(int argc, char **argv) {
   int parse_debug = 0;
   int default_config = 1;
   int pipe_server = 0;
-  int is_daemon = 0;
   int nodetach = 0;
   int csh_style = 0;
   char *logfile = NULL;
@@ -641,7 +556,7 @@ next_pass:
         log_info(_("Note: '%s' is not considered an option\n"), argv[i]);
   }
 
-  if (!pipe_server && !is_daemon && !is_supervised) {
+  if (!pipe_server) {
     /* We have been called without any command and thus we merely
        check whether an agent is already running.  We do this right
        here so that we don't clobber a logfile with this check but
@@ -663,7 +578,6 @@ next_pass:
   create_directories();
 
   if (debug_wait && pipe_server) {
-    thread_init_once();
     log_debug("waiting for debugger - my pid is %u .....\n",
               (unsigned int)getpid());
     gnupg_sleep(debug_wait);
@@ -682,8 +596,6 @@ next_pass:
     /* This is the simple pipe based server */
     ctrl_t ctrl;
 
-    initialize_modules();
-
     ctrl = (ctrl_t)xtrycalloc(1, sizeof *ctrl);
     if (!ctrl) {
       log_error("error allocating connection control data: %s\n",
@@ -694,8 +606,8 @@ next_pass:
     start_command_handler(ctrl);
     agent_deinit_default_ctrl(ctrl);
     xfree(ctrl);
-  } else if (!is_daemon)
-    ; /* NOTREACHED */
+  }
+  /* NOTREACHED */
 
   return 0;
 }
@@ -741,9 +653,6 @@ static void agent_deinit_default_ctrl(ctrl_t ctrl) {
   if (ctrl->lc_ctype) xfree(ctrl->lc_ctype);
   if (ctrl->lc_messages) xfree(ctrl->lc_messages);
 }
-
-/* Return the number of active connections. */
-int get_agent_active_connection_count(void) { return active_connections; }
 
 /* Under W32, this function returns the handle of the scdaemon
    notification event.  Calling it the first time creates that

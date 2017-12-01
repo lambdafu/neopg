@@ -27,14 +27,6 @@ const char *gpg_strerror(gpg_error_t err) { return _gpg_strerror(err); }
 
 void gpg_err_set_errno(int err) { _gpg_err_set_errno(err); }
 
-void gpgrt_set_syscall_clamp(void (*pre)(void), void (*post)(void)) {
-  _gpgrt_set_syscall_clamp(pre, post);
-}
-
-void gpgrt_get_syscall_clamp(void (**r_pre)(void), void (**r_post)(void)) {
-  _gpgrt_get_syscall_clamp(r_pre, r_post);
-}
-
 void gpgrt_set_alloc_func(void *(*f)(void *a, size_t n)) {
   _gpgrt_set_alloc_func(f);
 }

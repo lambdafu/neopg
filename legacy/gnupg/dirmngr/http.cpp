@@ -74,14 +74,6 @@
 #include <time.h>
 #endif /*!HAVE_W32_SYSTEM*/
 
-#ifdef WITHOUT_NPTH /* Give the Makefile a chance to build without Pth.  */
-#undef USE_NPTH
-#endif
-
-#ifdef USE_NPTH
-#include <npth.h>
-#endif
-
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
 
@@ -93,13 +85,8 @@
 #include "http-common.h"
 #include "http.h"
 
-#ifdef USE_NPTH
-#define my_select(a, b, c, d, e) npth_select((a), (b), (c), (d), (e))
-#define my_accept(a, b, c) npth_accept((a), (b), (c))
-#else
 #define my_select(a, b, c, d, e) select((a), (b), (c), (d), (e))
 #define my_accept(a, b, c) accept((a), (b), (c))
-#endif
 
 #ifdef HAVE_W32_SYSTEM
 #define sock_close(a) closesocket(a)
@@ -312,12 +299,12 @@ static void _my_socket_unref(int lnr, my_socket_t so, void (*preclose)(void *),
 static ssize_t my_gnutls_read(gnutls_transport_ptr_t ptr, void *buffer,
                               size_t size) {
   my_socket_t sock = (my_socket_t)ptr;
-  return npth_read(sock->fd, buffer, size);
+  return read(sock->fd, buffer, size);
 }
 static ssize_t my_gnutls_write(gnutls_transport_ptr_t ptr, const void *buffer,
                                size_t size) {
   my_socket_t sock = (my_socket_t)ptr;
-  return npth_write(sock->fd, buffer, size);
+  return write(sock->fd, buffer, size);
 }
 
 /* This notification function is called by estream whenever stream is
@@ -2065,29 +2052,18 @@ static gpg_error_t connect_server(const char *server, unsigned short port,
   return 0;
 }
 
-/* Helper to read from a socket.  This handles npth things and
- * EINTR.  */
+/* Helper to read from a socket.  This handles EINTR.  */
 static gpgrt_ssize_t read_server(assuan_fd_t sock, void *buffer, size_t size) {
   int nread;
 
   do {
 #ifdef HAVE_W32_SYSTEM
 /* Under Windows we need to use recv for a socket.  */
-#if defined(USE_NPTH)
-    npth_unprotect();
-#endif
     nread = recv(FD2INT(sock), buffer, size, 0);
-#if defined(USE_NPTH)
-    npth_protect();
-#endif
 
 #else /*!HAVE_W32_SYSTEM*/
 
-#ifdef USE_NPTH
-    nread = npth_read(sock, buffer, size);
-#else
     nread = read(sock, buffer, size);
-#endif
 
 #endif /*!HAVE_W32_SYSTEM*/
   } while (nread == -1 && errno == EINTR);
@@ -2103,23 +2079,13 @@ static gpg_error_t write_server(assuan_fd_t sock, const char *data,
   nleft = length;
   while (nleft > 0) {
 #if defined(HAVE_W32_SYSTEM)
-#if defined(USE_NPTH)
-    npth_unprotect();
-#endif
     nwritten = send(FD2INT(sock), data, nleft, 0);
-#if defined(USE_NPTH)
-    npth_protect();
-#endif
     if (nwritten == SOCKET_ERROR) {
       log_info("network write failed: ec=%d\n", (int)WSAGetLastError());
       return GPG_ERR_NETWORK;
     }
 #else /*!HAVE_W32_SYSTEM*/
-#ifdef USE_NPTH
-    nwritten = npth_write(sock, data, nleft);
-#else
     nwritten = write(sock, data, nleft);
-#endif
     if (nwritten == -1) {
       if (errno == EINTR) continue;
       if (errno == EAGAIN) {

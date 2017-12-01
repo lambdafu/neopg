@@ -46,14 +46,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#ifdef WITHOUT_NPTH /* Give the Makefile a chance to build without Pth.  */
-#undef HAVE_NPTH
-#undef USE_NPTH
-#endif
-
-#ifdef HAVE_NPTH
-#include <npth.h>
-#endif
 #include <sys/wait.h>
 
 #ifdef HAVE_GETRLIMIT
@@ -526,13 +518,9 @@ gpg_error_t gnupg_wait_process(const char *pgmname, pid_t pid, int hang,
 
   if (pid == (pid_t)(-1)) return GPG_ERR_INV_VALUE;
 
-#ifdef USE_NPTH
-  i = npth_waitpid(pid, &status, hang ? 0 : WNOHANG);
-#else
   while ((i = waitpid(pid, &status, hang ? 0 : WNOHANG)) == (pid_t)(-1) &&
          errno == EINTR)
     ;
-#endif
 
   if (i == (pid_t)(-1)) {
     ec = gpg_error_from_errno(errno);
@@ -588,13 +576,9 @@ gpg_error_t gnupg_wait_processes(const char **pgmnames, pid_t *pids,
     pid_t pid;
     int status;
 
-#ifdef USE_NPTH
-    pid = npth_waitpid(-1, &status, hang ? 0 : WNOHANG);
-#else
     while ((pid = waitpid(-1, &status, hang ? 0 : WNOHANG)) == (pid_t)(-1) &&
            errno == EINTR)
       ;
-#endif
 
     if (pid == (pid_t)(-1)) {
       ec = gpg_error_from_errno(errno);

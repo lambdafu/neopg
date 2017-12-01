@@ -98,8 +98,6 @@
 #define gpgrt_vasprintf _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_snprintf _gpgrt_USE_UNDERSCORED_FUNCTION
 
-#define gpgrt_set_syscall_clamp _gpgrt_USE_UNDERSCORED_FUNCTION
-#define gpgrt_get_syscall_clamp _gpgrt_USE_UNDERSCORED_FUNCTION
 #define gpgrt_set_alloc_func _gpgrt_USE_UNDERSCORED_FUNCTION
 
 #endif /*!_GPGRT_INCL_BY_VISIBILITY_C*/

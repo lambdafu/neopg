@@ -21,6 +21,8 @@
 
 #include <config.h>
 
+#include <mutex>
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -33,7 +35,6 @@
 #ifndef HAVE_W32_SYSTEM
 #include <sys/wait.h>
 #endif
-#include <npth.h>
 
 #include <assuan.h>
 #include "../common/strlist.h"
@@ -93,7 +94,7 @@ struct inq_needpin_parm_s {
 static struct scd_local_s *scd_local_list;
 
 /* A Mutex used inside the start_scd function. */
-static npth_mutex_t start_scd_lock;
+static std::mutex start_scd_lock;
 
 /* The context of the primary connection.  This is also used as a flag
    to indicate whether the scdaemon has been started. */
@@ -105,21 +106,6 @@ static assuan_context_t primary_scd_ctx;
 static int primary_scd_ctx_reusable;
 
 /* Local prototypes.  */
-
-/* This function must be called once to initialize this module.  This
-   has to be done before a second thread is spawned.  We can't do the
-   static initialization because NPth emulation code might not be able
-   to do a static init; in particular, it is not possible for W32. */
-void initialize_module_call_scd(void) {
-  static int initialized;
-  int err;
-
-  if (!initialized) {
-    err = npth_mutex_init(&start_scd_lock, NULL);
-    if (err) log_fatal("error initializing mutex: %s\n", strerror(err));
-    initialized = 1;
-  }
-}
 
 /* This function may be called to print information pertaining to the
    current state of this module to the log. */
@@ -199,11 +185,7 @@ static int start_scd(ctrl_t ctrl) {
                  error instead. */
 
   /* We need to protect the following code. */
-  rc = npth_mutex_lock(&start_scd_lock);
-  if (rc) {
-    log_error("failed to acquire the start_scd lock: %s\n", strerror(rc));
-    return GPG_ERR_INTERNAL;
-  }
+  std::lock_guard<std::mutex> lock(start_scd_lock);
 
   /* Check whether the pipe server has already been started and in
      this case either reuse a lingering pipe connection or establish a
@@ -283,8 +265,6 @@ leave:
   } else {
     ctrl->scd_local->ctx = ctx;
   }
-  rc = npth_mutex_unlock(&start_scd_lock);
-  if (rc) log_error("failed to release the start_scd lock: %s\n", strerror(rc));
   return err;
 }
 

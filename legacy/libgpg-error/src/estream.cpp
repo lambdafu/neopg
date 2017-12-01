@@ -182,13 +182,6 @@ static unsigned char custom_std_fds_valid[3];
 std::mutex estream_list_lock;
 
 /*
- * Functions called before and after blocking syscalls.
- * gpgrt_set_syscall_clamp is used to set them.
- */
-static void (*pre_syscall_func)(void);
-static void (*post_syscall_func)(void);
-
-/*
  * Error code replacements.
  */
 #ifndef EOPNOTSUPP
@@ -353,10 +346,6 @@ static void do_deinit(void) {
      list and the streams with possible undesirable effects.  Given
      that we don't close the stream either, it should not matter that
      we keep the list and let the OS clean it up at process end.  */
-
-  /* Reset the syscall clamp.  */
-  pre_syscall_func = NULL;
-  post_syscall_func = NULL;
 }
 
 /*
@@ -370,30 +359,6 @@ int _gpgrt_estream_init(void) {
     atexit(do_deinit);
   }
   return 0;
-}
-
-/*
- * Register the syscall clamp.  These two functions are called
- * immediately before and after a possible blocking system call.  This
- * should be used before any I/O happens.  The function is commonly
- * used with the nPth library:
- *
- *    gpgrt_set_syscall_clamp (npth_unprotect, npth_protect);
- *
- * These functions may not modify ERRNO.
- */
-void _gpgrt_set_syscall_clamp(void (*pre)(void), void (*post)(void)) {
-  pre_syscall_func = pre;
-  post_syscall_func = post;
-}
-
-/*
- * Return the current sycall clamp functions.  This can be used by
- * other libraries which have blocking functions.
- */
-void _gpgrt_get_syscall_clamp(void (**r_pre)(void), void (**r_post)(void)) {
-  *r_pre = pre_syscall_func;
-  *r_post = post_syscall_func;
 }
 
 /*
@@ -744,11 +709,9 @@ static gpgrt_ssize_t func_fd_read(void *cookie, void *buffer, size_t size)
   else if (IS_INVALID_FD(file_cookie->fd)) {
     bytes_read = 0;
   } else {
-    if (pre_syscall_func) pre_syscall_func();
     do {
       bytes_read = read(file_cookie->fd, buffer, size);
     } while (bytes_read == -1 && errno == EINTR);
-    if (post_syscall_func) post_syscall_func();
   }
 
   trace_errno(bytes_read == -1, ("leave: bytes_read=%d", (int)bytes_read));
@@ -768,11 +731,9 @@ static gpgrt_ssize_t func_fd_write(void *cookie, const void *buffer,
   if (IS_INVALID_FD(file_cookie->fd)) {
     bytes_written = size; /* Yeah:  Success writing to the bit bucket.  */
   } else if (buffer) {
-    if (pre_syscall_func) pre_syscall_func();
     do {
       bytes_written = write(file_cookie->fd, buffer, size);
     } while (bytes_written == -1 && errno == EINTR);
-    if (post_syscall_func) post_syscall_func();
   } else
     bytes_written = size; /* Note that for a flush SIZE should be 0.  */
 
@@ -793,9 +754,7 @@ static int func_fd_seek(void *cookie, gpgrt_off_t *offset, int whence) {
     _set_errno(ESPIPE);
     err = -1;
   } else {
-    if (pre_syscall_func) pre_syscall_func();
     offset_new = lseek(file_cookie->fd, *offset, whence);
-    if (post_syscall_func) post_syscall_func();
     if (offset_new == -1)
       err = -1;
     else {
@@ -883,19 +842,17 @@ static struct cookie_io_functions_s estream_functions_fd = {
 typedef struct estream_cookie_w32 {
   HANDLE hd;            /* The handle we are using for actual output.  */
   int no_close;         /* If set we won't close the handle.  */
-  int no_syscall_clamp; /* Do not use the syscall clamp. */
 } * estream_cookie_w32_t;
 
 /*
  * Create function for w32 handle objects.
  */
 static int func_w32_create(void **cookie, HANDLE hd, unsigned int modeflags,
-                           int no_close, int no_syscall_clamp) {
+                           int no_close) {
   estream_cookie_w32_t w32_cookie;
   int err;
 
-  trace(("enter: hd=%p mf=%x nc=%d nsc=%d", hd, modeflags, no_close,
-         no_syscall_clamp));
+  trace(("enter: hd=%p mf=%x nc=%d nsc=%d", hd, modeflags, no_close));
   w32_cookie = mem_alloc(sizeof(*w32_cookie));
   if (!w32_cookie)
     err = -1;
@@ -907,7 +864,6 @@ static int func_w32_create(void **cookie, HANDLE hd, unsigned int modeflags,
 
     w32_cookie->hd = hd;
     w32_cookie->no_close = no_close;
-    w32_cookie->no_syscall_clamp = no_syscall_clamp;
     *cookie = w32_cookie;
     err = 0;
   }
@@ -918,9 +874,6 @@ static int func_w32_create(void **cookie, HANDLE hd, unsigned int modeflags,
 
 /*
  * Read function for W32 handle objects.
- *
- * Note that this function may also be used by the reader thread of
- * w32-stream.  In that case the NO_SYSCALL_CLAMP is set.
  */
 static gpgrt_ssize_t func_w32_read(void *cookie, void *buffer, size_t size) {
   estream_cookie_w32_t w32_cookie = (estream_cookie_w32_t)cookie;
@@ -933,7 +886,6 @@ static gpgrt_ssize_t func_w32_read(void *cookie, void *buffer, size_t size) {
   else if (w32_cookie->hd == INVALID_HANDLE_VALUE) {
     bytes_read = 0;
   } else {
-    if (pre_syscall_func && !w32_cookie->no_syscall_clamp) pre_syscall_func();
     do {
       DWORD nread, ec;
 
@@ -950,7 +902,6 @@ static gpgrt_ssize_t func_w32_read(void *cookie, void *buffer, size_t size) {
       } else
         bytes_read = (int)nread;
     } while (bytes_read == -1 && errno == EINTR);
-    if (post_syscall_func && !w32_cookie->no_syscall_clamp) post_syscall_func();
   }
 
   trace_errno(bytes_read == -1, ("leave: bytes_read=%d", (int)bytes_read));
@@ -959,9 +910,6 @@ static gpgrt_ssize_t func_w32_read(void *cookie, void *buffer, size_t size) {
 
 /*
  * Write function for W32 handle objects.
- *
- * Note that this function may also be used by the writer thread of
- * w32-stream.  In that case the NO_SYSCALL_CLAMP is set.
  */
 static gpgrt_ssize_t func_w32_write(void *cookie, const void *buffer,
                                     size_t size) {
@@ -973,7 +921,6 @@ static gpgrt_ssize_t func_w32_write(void *cookie, const void *buffer,
   if (w32_cookie->hd == INVALID_HANDLE_VALUE) {
     bytes_written = size; /* Yeah:  Success writing to the bit bucket.  */
   } else if (buffer) {
-    if (pre_syscall_func && !w32_cookie->no_syscall_clamp) pre_syscall_func();
     do {
       DWORD nwritten;
 
@@ -986,7 +933,6 @@ static gpgrt_ssize_t func_w32_write(void *cookie, const void *buffer,
       } else
         bytes_written = (int)nwritten;
     } while (bytes_written == -1 && errno == EINTR);
-    if (post_syscall_func && !w32_cookie->no_syscall_clamp) post_syscall_func();
   } else
     bytes_written = size; /* Note that for a flush SIZE should be 0.  */
 
@@ -1021,13 +967,10 @@ static int func_w32_seek(void *cookie, gpgrt_off_t *offset, int whence) {
     _set_errno(EINVAL);
     return -1;
   }
-  if (pre_syscall_func && !w32_cookie->no_syscall_clamp) pre_syscall_func();
   if (!SetFilePointerEx(w32_cookie->hd, distance, &newoff, method)) {
     _set_errno(map_w32_to_errno(GetLastError()));
-    if (post_syscall_func) post_syscall_func();
     return -1;
   }
-  if (post_syscall_func && !w32_cookie->no_syscall_clamp) post_syscall_func();
 
   /* Note that gpgrt_off_t is always 64 bit.  */
   *offset = (gpgrt_off_t)newoff.QuadPart;
@@ -1126,9 +1069,7 @@ static gpgrt_ssize_t func_fp_read(void *cookie, void *buffer, size_t size)
   if (!size) return -1; /* We don't know whether anything is pending.  */
 
   if (file_cookie->fp) {
-    if (pre_syscall_func) pre_syscall_func();
     bytes_read = fread(buffer, 1, size, file_cookie->fp);
-    if (post_syscall_func) post_syscall_func();
   } else
     bytes_read = 0;
   if (!bytes_read && ferror(file_cookie->fp)) return -1;
@@ -1144,7 +1085,6 @@ static gpgrt_ssize_t func_fp_write(void *cookie, const void *buffer,
   size_t bytes_written;
 
   if (file_cookie->fp) {
-    if (pre_syscall_func) pre_syscall_func();
     if (buffer) {
 #ifdef HAVE_W32_SYSTEM
       /* Using an fwrite to stdout connected to the console fails
@@ -1168,7 +1108,6 @@ static gpgrt_ssize_t func_fp_write(void *cookie, const void *buffer,
       bytes_written = size;
 
     fflush(file_cookie->fp);
-    if (post_syscall_func) post_syscall_func();
   } else
     bytes_written = size; /* Successfully written to the bit bucket.  */
 
@@ -1188,16 +1127,13 @@ static int func_fp_seek(void *cookie, gpgrt_off_t *offset, int whence) {
     return -1;
   }
 
-  if (pre_syscall_func) pre_syscall_func();
   if (fseek(file_cookie->fp, (long int)*offset, whence)) {
     /* fprintf (stderr, "\nfseek failed: errno=%d (%s)\n", */
     /*          errno,strerror (errno)); */
-    if (post_syscall_func) post_syscall_func();
     return -1;
   }
 
   offset_new = ftell(file_cookie->fp);
-  if (post_syscall_func) post_syscall_func();
   if (offset_new == -1) {
     /* fprintf (stderr, "\nftell failed: errno=%d (%s)\n",  */
     /*          errno,strerror (errno)); */
@@ -1216,9 +1152,7 @@ static int func_fp_destroy(void *cookie) {
 
   if (fp_cookie) {
     if (fp_cookie->fp) {
-      if (pre_syscall_func) pre_syscall_func();
       fflush(fp_cookie->fp);
-      if (post_syscall_func) post_syscall_func();
       err = fp_cookie->no_close ? 0 : fclose(fp_cookie->fp);
     } else
       err = 0;
@@ -1652,9 +1586,7 @@ static int create_stream(estream_t *r_stream, void *cookie, es_syshd_t *syshd,
 #if HAVE_W32_SYSTEM
   if ((xmode & X_POLLABLE) && kind != BACKEND_W32) {
     /* We require the W32 backend, because only that allows us to
-     * write directly using the native W32 API and to disable the
-     * system clamp.  Note that func_w32_create has already been
-     * called with the flag to disable the system call clamp.  */
+     * write directly using the native W32 API.  */
     _set_errno(EINVAL);
     err = -1;
     goto out;

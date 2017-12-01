@@ -39,7 +39,6 @@
 #ifdef HAVE_INOTIFY_INIT
 #include <sys/inotify.h>
 #endif /*HAVE_INOTIFY_INIT*/
-#include <npth.h>
 
 #include <gnutls/gnutls.h>
 #include <gpg-error.h>
@@ -240,28 +239,6 @@ static int network_activity_seen;
 
 /* A list of filenames registred with --hkp-cacert.  */
 static std::vector<std::string> hkp_cacert_filenames;
-
-/* The timer tick used for housekeeping stuff.  */
-#define TIMERTICK_INTERVAL (60)
-
-/* How oft to run the housekeeping.  */
-#define HOUSEKEEPING_INTERVAL (600)
-
-/* This union is used to avoid compiler warnings in case a pointer is
-   64 bit and an int 32 bit.  We store an integer in a pointer and get
-   it back later (npth_getspecific et al.).  */
-union int_and_ptr_u {
-  int aint;
-  assuan_fd_t afd;
-  void *aptr;
-};
-
-/* The key used to store the current file descriptor in the thread
-   local storage.  We use this in conjunction with the
-   log_set_pid_suffix_cb feature.  */
-#ifndef HAVE_W32_SYSTEM
-static npth_key_t my_tlskey_current_fd;
-#endif
 
 /* Prototypes. */
 static void cleanup(void);
@@ -548,31 +525,6 @@ static void post_option_parsing(void) {
   set_debug();
 }
 
-#ifndef HAVE_W32_SYSTEM
-static int pid_suffix_callback(unsigned long *r_suffix) {
-  union int_and_ptr_u value;
-
-  memset(&value, 0, sizeof value);
-  value.aptr = npth_getspecific(my_tlskey_current_fd);
-  *r_suffix = value.aint;
-  return (*r_suffix != -1); /* Use decimal representation.  */
-}
-#endif /*!HAVE_W32_SYSTEM*/
-
-static void thread_init(void) {
-  npth_init();
-  gpgrt_set_syscall_clamp(npth_unprotect, npth_protect);
-
-/* Now with NPth running we can set the logging callback.  Our
-   windows implementation does not yet feature the NPth TLS
-   functions.  */
-#ifndef HAVE_W32_SYSTEM
-  if (npth_key_create(&my_tlskey_current_fd, NULL) == 0)
-    if (npth_setspecific(my_tlskey_current_fd, NULL) == 0)
-      log_set_pid_suffix_cb(pid_suffix_callback);
-#endif /*!HAVE_W32_SYSTEM*/
-}
-
 int dirmngr_main(int argc, char **argv) {
   enum cmd_and_opt_values cmd = (cmd_and_opt_values)0;
   ARGPARSE_ARGS pargs;
@@ -614,7 +566,6 @@ int dirmngr_main(int argc, char **argv) {
   malloc_hooks.free = gcry_free;
   assuan_set_malloc_hooks(&malloc_hooks);
   assuan_set_assuan_log_prefix(log_get_prefix(NULL));
-  assuan_set_system_hooks(ASSUAN_SYSTEM_NPTH);
   assuan_sock_init();
   setup_libassuan_logging(&opt.debug, dirmngr_assuan_log_monitor);
 
@@ -824,7 +775,6 @@ next_pass:
       log_debug("... okay\n");
     }
 
-    thread_init();
     cert_cache_init(hkp_cacert_filenames);
     crl_cache_init();
     http_register_netactivity_cb(netactivity_action);
@@ -840,7 +790,6 @@ next_pass:
     memset(&ctrlbuf, 0, sizeof ctrlbuf);
     dirmngr_init_default_ctrl(&ctrlbuf);
 
-    thread_init();
     cert_cache_init(hkp_cacert_filenames);
     crl_cache_init();
     if (!argc)
@@ -858,7 +807,6 @@ next_pass:
     memset(&ctrlbuf, 0, sizeof ctrlbuf);
     dirmngr_init_default_ctrl(&ctrlbuf);
 
-    thread_init();
     cert_cache_init(hkp_cacert_filenames);
     crl_cache_init();
     rc = crl_fetch(&ctrlbuf, argv[0], &reader);
@@ -1032,7 +980,7 @@ static int my_inotify_is_name(int fd, const char *name) {
   s = strrchr(name, '/');
   if (s && s[1]) name = s + 1;
 
-  n = npth_read(fd, &buf, sizeof buf);
+  n = read(fd, &buf, sizeof buf);
   if (n < sizeof(struct inotify_event)) return 0;
   if (buf.ev.len < strlen(name) + 1) return 0;
   if (strcmp(buf.ev.name, name)) return 0; /* Not the desired file.  */

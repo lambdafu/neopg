@@ -719,12 +719,6 @@ gpg_error_t gpg_err_init(void) _GPG_ERR_CONSTRUCTOR;
   } while (0)
 #endif
 
-/* Register blocking system I/O clamping functions.  */
-void gpgrt_set_syscall_clamp(void (*pre)(void), void (*post)(void));
-
-/* Get current I/O clamping functions.  */
-void gpgrt_get_syscall_clamp(void (**r_pre)(void), void (**r_post)(void));
-
 /* Register a custom malloc/realloc/free function.  */
 void gpgrt_set_alloc_func(void *(*f)(void *a, size_t n));
 

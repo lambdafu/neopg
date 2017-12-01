@@ -45,15 +45,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#ifdef WITHOUT_NPTH /* Give the Makefile a chance to build without Pth.  */
-#undef HAVE_NPTH
-#undef USE_NPTH
-#endif
-
-#ifdef HAVE_NPTH
-#include <npth.h>
-#endif
-
 #ifdef HAVE_STAT
 #include <sys/stat.h>
 #endif

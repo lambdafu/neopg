@@ -19,11 +19,11 @@
  * $Id$
  */
 
-#ifndef GNUPG_SCD_APP_COMMON_H
-#define GNUPG_SCD_APP_COMMON_H
+#pragma once
+
+#include <mutex>
 
 #include <ksba.h>
-#include <npth.h>
 
 #include "scdaemon.h"
 
@@ -36,31 +36,31 @@
 struct app_local_s; /* Defined by all app-*.c.  */
 
 struct app_ctx_s {
-  struct app_ctx_s *next;
+  struct app_ctx_s *next{nullptr};
 
-  npth_mutex_t lock;
+  std::mutex lock;
 
   /* Number of connections currently using this application context.
      If this is not 0 the application has been initialized and the
      function pointers may be used.  Note that for unsupported
      operations the particular function pointer is set to NULL */
-  unsigned int ref_count;
+  unsigned int ref_count{0};
 
   /* Used reader slot. */
-  int slot;
+  int slot{0};
 
-  unsigned char *serialno; /* Serialnumber in raw form, allocated. */
-  size_t serialnolen;      /* Length in octets of serialnumber. */
-  const char *apptype;
-  unsigned int card_version;
-  unsigned int card_status;
-  unsigned int reset_requested : 1;
-  unsigned int periodical_check_needed : 1;
-  unsigned int did_chv1 : 1;
-  unsigned int force_chv1 : 1; /* True if the card does not cache CHV1. */
-  unsigned int did_chv2 : 1;
-  unsigned int did_chv3 : 1;
-  struct app_local_s *app_local; /* Local to the application. */
+  unsigned char *serialno{nullptr}; /* Serialnumber in raw form, allocated. */
+  size_t serialnolen{0};      /* Length in octets of serialnumber. */
+  const char *apptype{nullptr};
+  unsigned int card_version{0};
+  unsigned int card_status{0};
+  unsigned int reset_requested {0};
+  unsigned int periodical_check_needed {0};
+  unsigned int did_chv1 {0};
+  unsigned int force_chv1 {0}; /* True if the card does not cache CHV1. */
+  unsigned int did_chv2 {0};
+  unsigned int did_chv3 {0};
+  struct app_local_s *app_local{nullptr}; /* Local to the application. */
   struct {
     void (*deinit)(app_t app);
     gpg_error_t (*learn_status)(app_t app, ctrl_t ctrl, unsigned int flags);
@@ -107,7 +107,7 @@ struct app_ctx_s {
                              gpg_error_t (*pincb)(void *, const char *,
                                                   char **),
                              void *pincb_arg);
-  } fnc;
+  } fnc{nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr};
 };
 
 /*-- app-help.c --*/
@@ -189,5 +189,3 @@ gpg_error_t app_select_p15(app_t app);
 
 /*-- app-sc-hsm.c --*/
 gpg_error_t app_select_sc_hsm(app_t app);
-
-#endif /*GNUPG_SCD_APP_COMMON_H*/

@@ -193,8 +193,7 @@ enum gcry_ctl_cmds {
   GCRYCTL_SET_SBOX = 73,
   GCRYCTL_DRBG_REINIT = 74,
   GCRYCTL_SET_TAGLEN = 75,
-  GCRYCTL_GET_TAGLEN = 76,
-  GCRYCTL_REINIT_SYSCALL_CLAMP = 77
+  GCRYCTL_GET_TAGLEN = 76
 };
 
 /* Perform various operations defined by CMD. */

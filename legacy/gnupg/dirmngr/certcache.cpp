@@ -19,10 +19,11 @@
 
 #include <config.h>
 
+#include <mutex>
+
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
-#include <npth.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -80,12 +81,8 @@ typedef struct cert_item_s *cert_item_t;
    the first byte of the fingerprint.  */
 static cert_item_t cert_cache[256];
 
-/* This is the global cache_lock variable. In general locking is not
-   needed but it would take extra efforts to make sure that no
-   indirect use of npth functions is done, so we simply lock it
-   always.  Note: We can't use static initialization, as that is not
-   available through w32-pth.  */
-static npth_rwlock_t cert_cache_lock;
+/* This is the global cache_lock variable.  */
+static std::mutex cache_lock;
 
 /* Flag to track whether the cache has been initialized.  */
 static int initialization_done;
@@ -102,43 +99,6 @@ typedef PCCERT_CONTEXT(WINAPI *CERTENUMCERTIFICATESINSTORE)(
     HCERTSTORE hCertStore, PCCERT_CONTEXT pPrevCertContext);
 typedef WINBOOL(WINAPI *CERTCLOSESTORE)(HCERTSTORE hCertStore, DWORD dwFlags);
 #endif /*HAVE_W32_SYSTEM*/
-
-/* Helper to do the cache locking.  */
-static void init_cache_lock(void) {
-  int err;
-
-  err = npth_rwlock_init(&cert_cache_lock, NULL);
-  if (err)
-    log_fatal(_("can't initialize certificate cache lock: %s\n"),
-              strerror(err));
-}
-
-static void acquire_cache_read_lock(void) {
-  int err;
-
-  err = npth_rwlock_rdlock(&cert_cache_lock);
-  if (err)
-    log_fatal(_("can't acquire read lock on the certificate cache: %s\n"),
-              strerror(err));
-}
-
-static void acquire_cache_write_lock(void) {
-  int err;
-
-  err = npth_rwlock_wrlock(&cert_cache_lock);
-  if (err)
-    log_fatal(_("can't acquire write lock on the certificate cache: %s\n"),
-              strerror(err));
-}
-
-static void release_cache_lock(void) {
-  int err;
-
-  err = npth_rwlock_unlock(&cert_cache_lock);
-  if (err)
-    log_fatal(_("can't release lock on the certificate cache: %s\n"),
-              strerror(err));
-}
 
 /* Return false if both serial numbers match.  Can't be used for
    sorting. */
@@ -595,28 +555,28 @@ void cert_cache_init(const std::vector<std::string> &hkp_cacerts) {
   char *fname;
 
   if (initialization_done) return;
-  init_cache_lock();
-  acquire_cache_write_lock();
 
-  load_certs_from_system();
-
-  fname = make_filename_try(gnupg_sysconfdir(), "trusted-certs", NULL);
-  if (fname) load_certs_from_dir(fname, CERTTRUST_CLASS_CONFIG);
-  xfree(fname);
-
-  fname = make_filename_try(gnupg_sysconfdir(), "extra-certs", NULL);
-  if (fname) load_certs_from_dir(fname, 0);
-  xfree(fname);
-
-  fname = make_filename_try(gnupg_datadir(), "sks-keyservers.netCA.pem", NULL);
-  if (fname) load_certs_from_file(fname, CERTTRUST_CLASS_HKPSPOOL, 1);
-  xfree(fname);
-
-  for (auto cacert : hkp_cacerts)
-    load_certs_from_file(cacert.c_str(), CERTTRUST_CLASS_HKP, 0);
-
-  initialization_done = 1;
-  release_cache_lock();
+  {
+    std::lock_guard<std::mutex> lock(cache_lock);
+    load_certs_from_system();
+    
+    fname = make_filename_try(gnupg_sysconfdir(), "trusted-certs", NULL);
+    if (fname) load_certs_from_dir(fname, CERTTRUST_CLASS_CONFIG);
+    xfree(fname);
+    
+    fname = make_filename_try(gnupg_sysconfdir(), "extra-certs", NULL);
+    if (fname) load_certs_from_dir(fname, 0);
+    xfree(fname);
+    
+    fname = make_filename_try(gnupg_datadir(), "sks-keyservers.netCA.pem", NULL);
+    if (fname) load_certs_from_file(fname, CERTTRUST_CLASS_HKPSPOOL, 1);
+    xfree(fname);
+    
+    for (auto cacert : hkp_cacerts)
+      load_certs_from_file(cacert.c_str(), CERTTRUST_CLASS_HKP, 0);
+    
+    initialization_done = 1;
+  }
 
   cert_cache_print_stats();
 }
@@ -629,7 +589,7 @@ void cert_cache_deinit(int full) {
 
   if (!initialization_done) return;
 
-  acquire_cache_write_lock();
+    std::lock_guard<std::mutex> lock(cache_lock);
 
   for (i = 0; i < 256; i++)
     for (ci = cert_cache[i]; ci; ci = ci->next) clean_cache_slot(ci);
@@ -646,7 +606,6 @@ void cert_cache_deinit(int full) {
 
   total_nonperm_certificates = 0;
   initialization_done = 0;
-  release_cache_lock();
 }
 
 /* Print some statistics to the log file.  */
@@ -661,7 +620,7 @@ void cert_cache_print_stats(void) {
   unsigned int n_trustclass_hkp = 0;
   unsigned int n_trustclass_hkpspool = 0;
 
-  acquire_cache_read_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   for (idx = 0; idx < 256; idx++)
     for (ci = cert_cache[idx]; ci; ci = ci->next)
       if (ci->cert) {
@@ -681,8 +640,6 @@ void cert_cache_print_stats(void) {
         }
       }
 
-  release_cache_lock();
-
   log_info(_("permanently loaded certificates: %u\n"), n_permanent);
   log_info(_("    runtime cached certificates: %u\n"), n_nonperm);
   log_info(_("           trusted certificates: %u (%u,%u,%u,%u)\n"), n_trusted,
@@ -694,9 +651,8 @@ void cert_cache_print_stats(void) {
 gpg_error_t cache_cert(ksba_cert_t cert) {
   gpg_error_t err;
 
-  acquire_cache_write_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   err = put_cert(cert, 0, 0, NULL);
-  release_cache_lock();
   if (err == GPG_ERR_DUP_VALUE)
     log_info(_("certificate already cached\n"));
   else if (!err)
@@ -713,9 +669,8 @@ gpg_error_t cache_cert(ksba_cert_t cert) {
 gpg_error_t cache_cert_silent(ksba_cert_t cert, void *fpr_buffer) {
   gpg_error_t err;
 
-  acquire_cache_write_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   err = put_cert(cert, 0, 0, fpr_buffer);
-  release_cache_lock();
   if (err == GPG_ERR_DUP_VALUE) err = 0;
   if (err) log_error(_("error caching certificate: %s\n"), gpg_strerror(err));
   return err;
@@ -730,15 +685,13 @@ gpg_error_t cache_cert_silent(ksba_cert_t cert, void *fpr_buffer) {
 ksba_cert_t get_cert_byfpr(const unsigned char *fpr) {
   cert_item_t ci;
 
-  acquire_cache_read_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   for (ci = cert_cache[*fpr]; ci; ci = ci->next)
     if (ci->cert && !memcmp(ci->fpr, fpr, 20)) {
       ksba_cert_ref(ci->cert);
-      release_cache_lock();
       return ci->cert;
     }
 
-  release_cache_lock();
   return NULL;
 }
 
@@ -779,18 +732,16 @@ ksba_cert_t get_cert_bysn(const char *issuer_dn, ksba_sexp_t serialno) {
   cert_item_t ci;
   int i;
 
-  acquire_cache_read_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   for (i = 0; i < 256; i++) {
     for (ci = cert_cache[i]; ci; ci = ci->next)
       if (ci->cert && !strcmp(ci->issuer_dn, issuer_dn) &&
           !compare_serialno(ci->sn, serialno)) {
         ksba_cert_ref(ci->cert);
-        release_cache_lock();
         return ci->cert;
       }
   }
 
-  release_cache_lock();
   return NULL;
 }
 
@@ -801,18 +752,16 @@ ksba_cert_t get_cert_byissuer(const char *issuer_dn, unsigned int seq) {
   cert_item_t ci;
   int i;
 
-  acquire_cache_read_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   for (i = 0; i < 256; i++) {
     for (ci = cert_cache[i]; ci; ci = ci->next)
       if (ci->cert && !strcmp(ci->issuer_dn, issuer_dn))
         if (!seq--) {
           ksba_cert_ref(ci->cert);
-          release_cache_lock();
           return ci->cert;
         }
   }
 
-  release_cache_lock();
   return NULL;
 }
 
@@ -825,18 +774,16 @@ ksba_cert_t get_cert_bysubject(const char *subject_dn, unsigned int seq) {
 
   if (!subject_dn) return NULL;
 
-  acquire_cache_read_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   for (i = 0; i < 256; i++) {
     for (ci = cert_cache[i]; ci; ci = ci->next)
       if (ci->cert && ci->subject_dn && !strcmp(ci->subject_dn, subject_dn))
         if (!seq--) {
           ksba_cert_ref(ci->cert);
-          release_cache_lock();
           return ci->cert;
         }
   }
 
-  release_cache_lock();
   return NULL;
 }
 
@@ -1213,17 +1160,15 @@ ksba_cert_t find_cert_bysubject(ctrl_t ctrl, const char *subject_dn,
     int i;
 
     /* For efficiency reasons we won't use get_cert_bysubject here. */
-    acquire_cache_read_lock();
+    std::lock_guard<std::mutex> lock(cache_lock);
     for (i = 0; i < 256; i++)
       for (ci = cert_cache[i]; ci; ci = ci->next)
         if (ci->cert && ci->subject_dn && !strcmp(ci->subject_dn, subject_dn))
           for (cr = ctrl->ocsp_certs; cr; cr = cr->next)
             if (!memcmp(ci->fpr, cr->fpr, 20)) {
               ksba_cert_ref(ci->cert);
-              release_cache_lock();
               return ci->cert; /* We use this certificate. */
             }
-    release_cache_lock();
     if (DBG_LOOKUP)
       log_debug("find_cert_bysubject: certificate not in ocsp_certs\n");
   }
@@ -1344,19 +1289,17 @@ gpg_error_t is_trusted_cert(ksba_cert_t cert, unsigned int trustclasses) {
 
   cert_compute_fpr(cert, fpr);
 
-  acquire_cache_read_lock();
+  std::lock_guard<std::mutex> lock(cache_lock);
   for (ci = cert_cache[*fpr]; ci; ci = ci->next)
     if (ci->cert && !memcmp(ci->fpr, fpr, 20)) {
       if ((ci->trustclasses & trustclasses)) {
         /* The certificate is trusted in one of the given
          * TRUSTCLASSES.  */
-        release_cache_lock();
         return 0; /* Yes, it is trusted. */
       }
       break;
     }
 
-  release_cache_lock();
   return GPG_ERR_NOT_TRUSTED;
 }
 

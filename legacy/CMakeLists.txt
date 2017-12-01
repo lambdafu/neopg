@@ -123,36 +123,6 @@ target_link_libraries(assuan-test PRIVATE
   GTest::GTest GTest::Main)
 add_test(AssuanTest assuan-test COMMAND assuan-test test_xml_output --gtest_output=xml:assuan-test.xml)
 
-# npth
-
-add_library(npth
-  npth/src/npth.h
-  npth/src/npth.cpp
-)
-add_library(neopg::npth ALIAS npth)
-
-target_include_directories(npth PRIVATE
-  npth/src
-  ${CMAKE_BINARY_DIR}/.)
-target_compile_definitions(npth PRIVATE
-  HAVE_CONFIG_H=1)
-
-target_compile_options(npth PRIVATE -fpermissive
-)
-
-add_executable(npth-test
-  npth/tests/t-mutex.cpp
-  npth/tests/t-support.h
-  npth/tests/t-thread.cpp
-  npth/tests/npth-test.cpp)
-target_include_directories(npth-test PRIVATE
-  npth/src
-  ${CMAKE_BINARY_DIR}/.)
-target_link_libraries(npth-test PRIVATE
-  npth
-  GTest::GTest GTest::Main)
-add_test(nPthTest npth-test COMMAND npth-test test_xml_output --gtest_output=xml:npth-test.xml)
-
 # libgcrypt
 
 add_library(gcrypt

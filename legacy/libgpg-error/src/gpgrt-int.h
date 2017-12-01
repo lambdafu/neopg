@@ -122,8 +122,6 @@ typedef struct _gpgrt_stream_internal *estream_internal_t;
 
 /* Local prototypes for estream.  */
 int _gpgrt_estream_init(void);
-void _gpgrt_set_syscall_clamp(void (*pre)(void), void (*post)(void));
-void _gpgrt_get_syscall_clamp(void (**r_pre)(void), void (**r_post)(void));
 
 gpgrt_stream_t _gpgrt_fopen(const char *_GPGRT__RESTRICT path,
                             const char *_GPGRT__RESTRICT mode);
@@ -248,8 +246,5 @@ gpgrt_b64state_t _gpgrt_b64dec_start(const char *title);
 gpg_error_t _gpgrt_b64dec_proc(gpgrt_b64state_t state, void *buffer,
                                size_t length, size_t *r_nbytes);
 gpg_error_t _gpgrt_b64dec_finish(gpgrt_b64state_t state);
-
-void _gpgrt_lock_set_lock_clamp(void (*pre)(void), void (*post)(void));
-void _gpgrt_thread_set_syscall_clamp(void (*pre)(void), void (*post)(void));
 
 #endif /*_GPGRT_GPGRT_INT_H*/

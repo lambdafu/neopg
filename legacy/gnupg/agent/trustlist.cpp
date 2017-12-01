@@ -18,11 +18,13 @@
  * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <assert.h>
 #include <config.h>
+
+#include <mutex>
+
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include <npth.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +52,7 @@ typedef struct trustitem_s trustitem_t;
 static trustitem_t *trusttable;
 static size_t trusttablesize;
 /* A mutex used to protect the table. */
-static npth_mutex_t trusttable_lock;
+static std::mutex trusttable_lock;
 
 static const char headerblurb[] =
     "# This is the list of trusted keys.  Comment lines, like this one, as\n"
@@ -67,38 +69,6 @@ static const char headerblurb[] =
     "# Include the default trust list\n"
     "include-default\n"
     "\n";
-
-/* This function must be called once to initialize this module.  This
-   has to be done before a second thread is spawned.  We can't do the
-   static initialization because Pth emulation code might not be able
-   to do a static init; in particular, it is not possible for W32. */
-void initialize_module_trustlist(void) {
-  static int initialized;
-  int err;
-
-  if (!initialized) {
-    err = npth_mutex_init(&trusttable_lock, NULL);
-    if (err)
-      log_fatal("failed to init mutex in %s: %s\n", __FILE__, strerror(err));
-    initialized = 1;
-  }
-}
-
-static void lock_trusttable(void) {
-  int err;
-
-  err = npth_mutex_lock(&trusttable_lock);
-  if (err)
-    log_fatal("failed to acquire mutex in %s: %s\n", __FILE__, strerror(err));
-}
-
-static void unlock_trusttable(void) {
-  int err;
-
-  err = npth_mutex_unlock(&trusttable_lock);
-  if (err)
-    log_fatal("failed to release mutex in %s: %s\n", __FILE__, strerror(err));
-}
 
 /* Clear the trusttable.  The caller needs to make sure that the
    trusttable is locked.  */
@@ -353,7 +323,7 @@ static gpg_error_t istrusted_internal(ctrl_t ctrl, const char *fpr,
   }
 
   if (!already_locked) {
-    lock_trusttable();
+    trusttable_lock.lock();
     locked = 1;
   }
 
@@ -375,11 +345,11 @@ static gpg_error_t istrusted_internal(ctrl_t ctrl, const char *fpr,
         if (already_locked)
           ;
         else if (ti->flags.relax) {
-          unlock_trusttable();
+          trusttable_lock.unlock();
           locked = 0;
           err = agent_write_status(ctrl, "TRUSTLISTFLAG", "relax", NULL);
         } else if (ti->flags.cm) {
-          unlock_trusttable();
+          trusttable_lock.unlock();
           locked = 0;
           err = agent_write_status(ctrl, "TRUSTLISTFLAG", "cm", NULL);
         }
@@ -391,7 +361,7 @@ static gpg_error_t istrusted_internal(ctrl_t ctrl, const char *fpr,
   err = GPG_ERR_NOT_TRUSTED;
 
 leave:
-  if (locked && !already_locked) unlock_trusttable();
+  if (locked && !already_locked) trusttable_lock.unlock();
   return err;
 }
 
@@ -407,12 +377,11 @@ gpg_error_t agent_listtrusted(void *assuan_context) {
   char key[51];
   gpg_error_t err;
   size_t len;
-
-  lock_trusttable();
+  std::lock_guard<std::mutex> lock(trusttable_lock);
+  
   if (!trusttable) {
     err = read_trustfiles();
     if (err) {
-      unlock_trusttable();
       log_error(_("error reading list of trusted root certificates\n"));
       return err;
     }
@@ -433,7 +402,6 @@ gpg_error_t agent_listtrusted(void *assuan_context) {
     }
   }
 
-  unlock_trusttable();
   return 0;
 }
 
@@ -615,10 +583,9 @@ gpg_error_t agent_marktrusted(ctrl_t ctrl, const char *name, const char *fpr,
 
   /* Now check again to avoid duplicates.  We take the lock to make
      sure that nobody else plays with our file and force a reread.  */
-  lock_trusttable();
+  std::lock_guard<std::mutex> lock(trusttable_lock);
   clear_trusttable();
   if (!istrusted_internal(ctrl, fpr, &is_disabled, 1) || is_disabled) {
-    unlock_trusttable();
     xfree(fprformatted);
     xfree(nameformatted);
     return is_disabled ? GPG_ERR_NOT_TRUSTED : 0;
@@ -627,7 +594,6 @@ gpg_error_t agent_marktrusted(ctrl_t ctrl, const char *name, const char *fpr,
   fname = make_filename_try(gnupg_homedir(), "trustlist.txt", NULL);
   if (!fname) {
     err = gpg_error_from_syserror();
-    unlock_trusttable();
     xfree(fprformatted);
     xfree(nameformatted);
     return err;
@@ -638,7 +604,6 @@ gpg_error_t agent_marktrusted(ctrl_t ctrl, const char *name, const char *fpr,
       err = gpg_error_from_syserror();
       log_error("can't create '%s': %s\n", fname, gpg_strerror(err));
       xfree(fname);
-      unlock_trusttable();
       xfree(fprformatted);
       xfree(nameformatted);
       return err;
@@ -651,7 +616,6 @@ gpg_error_t agent_marktrusted(ctrl_t ctrl, const char *name, const char *fpr,
     err = gpg_error_from_syserror();
     log_error("can't open '%s': %s\n", fname, gpg_strerror(err));
     xfree(fname);
-    unlock_trusttable();
     xfree(fprformatted);
     xfree(nameformatted);
     return err;
@@ -675,7 +639,6 @@ gpg_error_t agent_marktrusted(ctrl_t ctrl, const char *name, const char *fpr,
 
   clear_trusttable();
   xfree(fname);
-  unlock_trusttable();
   xfree(fprformatted);
   xfree(nameformatted);
   return err;
@@ -686,7 +649,6 @@ gpg_error_t agent_marktrusted(ctrl_t ctrl, const char *name, const char *fpr,
 void agent_reload_trustlist(void) {
   /* All we need to do is to delete the trusttable.  At the next
      access it will get re-read. */
-  lock_trusttable();
+  std::lock_guard<std::mutex> lock(trusttable_lock);
   clear_trusttable();
-  unlock_trusttable();
 }

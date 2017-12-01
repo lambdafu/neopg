@@ -49,14 +49,6 @@ static unsigned int debug_flags;
 /* Controlled by global_init().  */
 static int any_init_done;
 
-/*
- * Functions called before and after blocking syscalls.
- * Initialized by global_init and used via
- * _gcry_pre_syscall and _gcry_post_syscall.
- */
-static void (*pre_syscall_func)(void);
-static void (*post_syscall_func)(void);
-
 /* Memory management. */
 
 static gcry_handler_no_mem_t outofcore_handler;
@@ -70,10 +62,6 @@ static void global_init(void) {
 
   if (any_init_done) return;
   any_init_done = 1;
-
-  /* Get the system call clamp functions.  */
-  if (!pre_syscall_func)
-    gpgrt_get_syscall_clamp(&pre_syscall_func, &post_syscall_func);
 
   /* Before we do any other initialization we need to test available
      hardware features.  */
@@ -404,11 +392,6 @@ gpg_error_t _gcry_vcontrol(enum gcry_ctl_cmds cmd, va_list arg_ptr) {
           (_gcry_secmem_get_flags() | GCRY_SECMEM_FLAG_NO_PRIV_DROP));
       break;
 
-    case GCRYCTL_REINIT_SYSCALL_CLAMP:
-      if (!pre_syscall_func)
-        gpgrt_get_syscall_clamp(&pre_syscall_func, &post_syscall_func);
-      break;
-
     default:
       rc = GPG_ERR_INV_OP;
   }
@@ -658,16 +641,6 @@ char *_gcry_xstrdup(const char *string) {
   }
 
   return p;
-}
-
-/* Used before blocking system calls.  */
-void _gcry_pre_syscall(void) {
-  if (pre_syscall_func) pre_syscall_func();
-}
-
-/* Used after blocking system calls.  */
-void _gcry_post_syscall(void) {
-  if (post_syscall_func) post_syscall_func();
 }
 
 int _gcry_get_debug_flag(unsigned int mask) { return (debug_flags & mask); }

@@ -18,21 +18,17 @@
  * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-/* NOTE: This module is also used by other software, thus the use of
-   the macro USE_NPTH is mandatory.  For GnuPG this macro is
-   guaranteed to be defined true. */
+#include <config.h>
+
+#include <mutex>
 
 #include <assert.h>
-#include <config.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef USE_NPTH
 #include <fcntl.h>
-#include <npth.h>
 #include <unistd.h>
-#endif
 
 /* If requested include the definitions for the remote APDU protocol
    code. */
@@ -115,58 +111,32 @@ struct reader_table_s {
   size_t atrlen; /* A zero length indicates that the ATR has
                     not yet been read; i.e. the card is not
                     ready for use. */
-#ifdef USE_NPTH
-  npth_mutex_t lock;
-#endif
+  std::mutex lock;
 };
 typedef struct reader_table_s *reader_table_t;
 
 /* A global table to keep track of active readers. */
 static struct reader_table_s reader_table[MAX_READER];
 
-#ifdef USE_NPTH
-static npth_mutex_t reader_table_lock;
-#endif
+static std::mutex reader_table_lock;
 
 /*
       Helper
  */
 
 static int lock_slot(int slot) {
-#ifdef USE_NPTH
-  int err;
-
-  err = npth_mutex_lock(&reader_table[slot].lock);
-  if (err) {
-    log_error("failed to acquire apdu lock: %s\n", strerror(err));
-    return SW_HOST_LOCKING_FAILED;
-  }
-#endif /*USE_NPTH*/
+  reader_table[slot].lock.lock();
   return 0;
 }
 
 static int trylock_slot(int slot) {
-#ifdef USE_NPTH
-  int err;
-
-  err = npth_mutex_trylock(&reader_table[slot].lock);
-  if (err == EBUSY)
+  if (!reader_table[slot].lock.try_lock())
     return SW_HOST_BUSY;
-  else if (err) {
-    log_error("failed to acquire apdu lock: %s\n", strerror(err));
-    return SW_HOST_LOCKING_FAILED;
-  }
-#endif /*USE_NPTH*/
   return 0;
 }
 
 static void unlock_slot(int slot) {
-#ifdef USE_NPTH
-  int err;
-
-  err = npth_mutex_unlock(&reader_table[slot].lock);
-  if (err) log_error("failed to release apdu lock: %s\n", strerror(errno));
-#endif /*USE_NPTH*/
+  reader_table[slot].lock.unlock();
 }
 
 /* Find an unused reader slot for PORTSTR and put it into the reader
@@ -744,7 +714,7 @@ gpg_error_t apdu_dev_list_start(const char *portstr, struct dev_list **l_p) {
   dl->portstr = portstr;
   dl->idx = 0;
 
-  npth_mutex_lock(&reader_table_lock);
+  reader_table_lock.lock();
 
 #ifdef HAVE_LIBUSB
   if (opt.disable_ccid) {
@@ -764,7 +734,7 @@ gpg_error_t apdu_dev_list_start(const char *portstr, struct dev_list **l_p) {
           log_debug("leave: apdu_open_reader => slot=-1 (no ccid)\n");
 
         xfree(dl);
-        npth_mutex_unlock(&reader_table_lock);
+        reader_table_lock.unlock();
         return GPG_ERR_ENODEV;
       } else
         dl->idx_max = 1;
@@ -784,7 +754,7 @@ void apdu_dev_list_finish(struct dev_list *dl) {
   if (dl->ccid_table) ccid_dev_scan_finish(dl->ccid_table, dl->idx_max);
 #endif
   xfree(dl);
-  npth_mutex_unlock(&reader_table_lock);
+  reader_table_lock.unlock();
 }
 
 int apdu_open_reader(struct dev_list *dl, int app_empty) {
@@ -937,7 +907,7 @@ void apdu_prepare_exit(void) {
 
   if (!sentinel) {
     sentinel = 1;
-    npth_mutex_lock(&reader_table_lock);
+    std::lock_guard<std::mutex> lock(reader_table_lock);
     for (slot = 0; slot < MAX_READER; slot++)
       if (reader_table[slot].used) {
         apdu_disconnect(slot);
@@ -947,7 +917,6 @@ void apdu_prepare_exit(void) {
         reader_table[slot].rdrname = NULL;
         reader_table[slot].used = 0;
       }
-    npth_mutex_unlock(&reader_table_lock);
     sentinel = 0;
   }
 }
@@ -1768,25 +1737,4 @@ int apdu_send_direct(int slot, size_t extended_length,
 
 const char *apdu_get_reader_name(int slot) {
   return reader_table[slot].rdrname;
-}
-
-gpg_error_t apdu_init(void) {
-#ifdef USE_NPTH
-  gpg_error_t err;
-  int i;
-
-  if (npth_mutex_init(&reader_table_lock, NULL)) goto leave;
-
-  for (i = 0; i < MAX_READER; i++)
-    if (npth_mutex_init(&reader_table[i].lock, NULL)) goto leave;
-
-  /* All done well.  */
-  return 0;
-
-leave:
-  err = gpg_error_from_syserror();
-  log_error("apdu: error initializing mutex: %s\n", gpg_strerror(err));
-  return err;
-#endif /*USE_NPTH*/
-  return 0;
 }

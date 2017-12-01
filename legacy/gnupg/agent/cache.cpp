@@ -19,8 +19,9 @@
 
 #include <config.h>
 
+#include <mutex>
+
 #include <assert.h>
-#include <npth.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,7 +44,7 @@ static const size_t ENCRYPTION_KEYSIZE = 128 / 8;
 static Botan::SymmetricKey *encryption_handle;
 
 /* A mutex used to serialize access to the cache.  */
-static npth_mutex_t cache_lock;
+static std::mutex cache_lock;
 
 struct secret_data_s {
   int totallen; /* This includes the padding and space for AESWRAP. */
@@ -66,16 +67,6 @@ static ITEM thecache;
 
 /* NULL or the last cache key stored by agent_store_cache_hit.  */
 static char *last_stored_cache_key;
-
-/* This function must be called once to initialize this module. It
-   has to be done before a second thread is spawned.  */
-void initialize_module_cache(void) {
-  int err;
-
-  err = npth_mutex_init(&cache_lock, NULL);
-
-  if (err) log_fatal("error initializing cache module: %s\n", strerror(err));
-}
 
 void deinitialize_module_cache(void) {
   delete encryption_handle;
@@ -211,8 +202,7 @@ void agent_flush_cache(void) {
 
   if (DBG_CACHE) log_debug("agent_flush_cache\n");
 
-  res = npth_mutex_lock(&cache_lock);
-  if (res) log_fatal("failed to acquire cache mutex: %s\n", strerror(res));
+  std::lock_guard<std::mutex> lock(cache_lock);
 
   for (r = thecache; r; r = r->next) {
     if (r->pw) {
@@ -222,9 +212,6 @@ void agent_flush_cache(void) {
       r->accessed = 0;
     }
   }
-
-  res = npth_mutex_unlock(&cache_lock);
-  if (res) log_fatal("failed to release cache mutex: %s\n", strerror(res));
 }
 
 /* Compare two cache modes.  */
@@ -246,8 +233,7 @@ int agent_put_cache(const char *key, cache_mode_t cache_mode, const char *data,
   ITEM r;
   int res;
 
-  res = npth_mutex_lock(&cache_lock);
-  if (res) log_fatal("failed to acquire cache mutex: %s\n", strerror(res));
+  std::lock_guard<std::mutex> lock(cache_lock);
 
   if (DBG_CACHE)
     log_debug("agent_put_cache '%s' (mode %d) requested ttl=%d\n", key,
@@ -298,9 +284,6 @@ int agent_put_cache(const char *key, cache_mode_t cache_mode, const char *data,
   }
 
 out:
-  res = npth_mutex_unlock(&cache_lock);
-  if (res) log_fatal("failed to release cache mutex: %s\n", strerror(res));
-
   return err;
 }
 
@@ -316,8 +299,7 @@ char *agent_get_cache(const char *key, cache_mode_t cache_mode) {
 
   if (cache_mode == CACHE_MODE_IGNORE) return NULL;
 
-  res = npth_mutex_lock(&cache_lock);
-  if (res) log_fatal("failed to acquire cache mutex: %s\n", strerror(res));
+  std::lock_guard<std::mutex> lock(cache_lock);
 
   if (!key) {
     key = last_stored_cache_key;
@@ -365,9 +347,6 @@ char *agent_get_cache(const char *key, cache_mode_t cache_mode) {
   if (DBG_CACHE && value == NULL) log_debug("... miss\n");
 
 out:
-  res = npth_mutex_unlock(&cache_lock);
-  if (res) log_fatal("failed to release cache mutex: %s\n", strerror(res));
-
   return value;
 }
 

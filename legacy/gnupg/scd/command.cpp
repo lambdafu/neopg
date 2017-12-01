@@ -26,9 +26,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef USE_NPTH
-#include <npth.h>
-#endif
 
 #include <assuan.h>
 #include <ksba.h>
@@ -1105,18 +1102,6 @@ retry:
     if (locked_session != ctrl->server_local) rc = GPG_ERR_LOCKED;
   } else
     locked_session = ctrl->server_local;
-
-#ifdef USE_NPTH
-  if (rc && has_option(line, "--wait")) {
-    rc = 0;
-    npth_sleep(1); /* Better implement an event mechanism. However,
-                      for card operations this should be
-                      sufficient. */
-    /* FIXME: Need to check that the connection is still alive.
-       This can be done by issuing status messages. */
-    goto retry;
-  }
-#endif /*USE_NPTH*/
 
   if (rc) log_error("cmd_lock failed: %s\n", gpg_strerror(rc));
   return rc;

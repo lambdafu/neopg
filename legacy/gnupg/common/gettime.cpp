@@ -73,10 +73,7 @@ time_t gnupg_get_time() {
 /* Wrapper around gmtime_r.
 
    On systems without gmtime_r this implementation works within gnupg
-   because we use only one thread a time.  FIXME: An independent
-   library may use gmtime in one of its own thread (or via
-   npth_enter/npth_leave) - in this case we run into a problem.  The
-   solution would be to use a mutex here.  */
+   because we use only one thread a time.  FIXME */
 struct tm *gnupg_gmtime(const time_t *timep, struct tm *result) {
 #ifdef HAVE_GMTIME_R
   return gmtime_r(timep, result);

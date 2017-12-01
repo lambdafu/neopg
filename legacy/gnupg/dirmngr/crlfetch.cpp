@@ -21,7 +21,6 @@
 #include <config.h>
 
 #include <errno.h>
-#include <npth.h>
 #include <stdio.h>
 
 #include "crlfetch.h"
@@ -62,7 +61,7 @@ static void register_file_reader(ksba_reader_t reader,
         return;
       }
     log_info(_("reader to file mapping table full - waiting\n"));
-    npth_sleep(2);
+    gnupg_sleep(2);
   }
 }
 
