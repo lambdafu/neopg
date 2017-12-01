@@ -17,8 +17,12 @@
  * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <assert.h>
 #include <config.h>
+
+#include <boost/format.hpp>
+#include <sstream>
+
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +30,7 @@
 
 #include <gpg-error.h>
 #include "../common/logging.h"
+#include "../common/util.h"
 #include "atr.h"
 
 static int const fi_table[16] = {0,  372, 558, 744,  1116, 1488, 1860, -1,
@@ -40,31 +45,28 @@ static int const di_table[16] = {-1, 1,  2,  4,  8,  16,  -1,  -1,
 char *atr_dump(const void *buffer, size_t buflen) {
   const unsigned char *atr = (const unsigned char *)buffer;
   size_t atrlen = buflen;
-  estream_t fp;
+  std::stringstream fp;
   int have_ta, have_tb, have_tc, have_td;
   int n_historical;
   int idx, val;
   unsigned char chksum;
   char *result;
 
-  fp = es_fopenmem(0, "rwb");
-  if (!fp) return NULL;
-
   if (!atrlen) {
-    es_fprintf(fp, "error: empty ATR\n");
+    fp << "error: empty ATR\n";
     goto bailout;
   }
 
   for (idx = 0; idx < atrlen; idx++)
-    es_fprintf(fp, "%s%02X", idx ? " " : "", atr[idx]);
-  es_putc('\n', fp);
+    fp << boost::format("%s%02X") % (idx ? " " : "") % atr[idx];
+  fp << '\n';
 
   if (*atr == 0x3b)
-    es_fputs("Direct convention\n", fp);
+    fp << "Direct convention\n";
   else if (*atr == 0x3f)
-    es_fputs("Inverse convention\n", fp);
+    fp << "Inverse convention\n";
   else
-    es_fprintf(fp, "error: invalid TS character 0x%02x\n", *atr);
+    fp << boost::format("error: invalid TS character 0x%02x\n") % *atr;
   if (!--atrlen) goto bailout;
   atr++;
 
@@ -76,49 +78,49 @@ char *atr_dump(const void *buffer, size_t buflen) {
   have_tc = !!(*atr & 0x40);
   have_td = !!(*atr & 0x80);
   n_historical = (*atr & 0x0f);
-  es_fprintf(fp, "%d historical characters indicated\n", n_historical);
+  fp << n_historical << " historical characters indicated\n";
 
   if (have_ta + have_tb + have_tc + have_td + n_historical > atrlen)
-    es_fputs("error: ATR shorter than indicated by format character\n", fp);
+    fp << "error: ATR shorter than indicated by format character\n";
   if (!--atrlen) goto bailout;
   atr++;
 
   if (have_ta) {
-    es_fputs("TA1: F=", fp);
+    fp << "TA1: F=";
     val = fi_table[(*atr >> 4) & 0x0f];
     if (!val)
-      es_fputs("internal clock", fp);
+      fp << "internal clock";
     else if (val == -1)
-      es_fputs("RFU", fp);
+      fp << "RFU";
     else
-      es_fprintf(fp, "%d", val);
-    es_fputs(" D=", fp);
+      fp << val;
+    fp << " D=";
     val = di_table[*atr & 0x0f];
     if (!val)
-      es_fputs("[impossible value]\n", fp);
+      fp << "[impossible value]\n";
     else if (val == -1)
-      es_fputs("RFU\n", fp);
+      fp << "RFU\n";
     else if (val < 0)
-      es_fprintf(fp, "1/%d\n", val);
+      fp << "1/" << val << "\n";
     else
-      es_fprintf(fp, "%d\n", val);
+      fp << val << "\n";
 
     if (!--atrlen) goto bailout;
     atr++;
   }
 
   if (have_tb) {
-    es_fprintf(fp, "TB1: II=%d PI1=%d%s\n", ((*atr >> 5) & 3), (*atr & 0x1f),
-               (*atr & 0x80) ? " [high bit not cleared]" : "");
+    fp << boost::format("TB1: II=%d PI1=%d%s\n") % ((*atr >> 5) & 3) %
+              (*atr & 0x1f) % ((*atr & 0x80) ? " [high bit not cleared]" : "");
     if (!--atrlen) goto bailout;
     atr++;
   }
 
   if (have_tc) {
     if (*atr == 255)
-      es_fputs("TC1: guard time shortened to 1 etu\n", fp);
+      fp << "TC1: guard time shortened to 1 etu\n";
     else
-      es_fprintf(fp, "TC1: (extra guard time) N=%d\n", *atr);
+      fp << boost::format("TC1: (extra guard time) N=%d\n") % ((int)*atr);
 
     if (!--atrlen) goto bailout;
     atr++;
@@ -129,10 +131,10 @@ char *atr_dump(const void *buffer, size_t buflen) {
     have_tb = !!(*atr & 0x20);
     have_tc = !!(*atr & 0x40);
     have_td = !!(*atr & 0x80);
-    es_fprintf(fp, "TD1: protocol T%d supported\n", (*atr & 0x0f));
+    fp << boost::format("TD1: protocol T%d supported\n") % ((int)(*atr & 0x0f));
 
     if (have_ta + have_tb + have_tc + have_td + n_historical > atrlen)
-      es_fputs("error: ATR shorter than indicated by format character\n", fp);
+      fp << "error: ATR shorter than indicated by format character\n";
 
     if (!--atrlen) goto bailout;
     atr++;
@@ -140,23 +142,23 @@ char *atr_dump(const void *buffer, size_t buflen) {
     have_ta = have_tb = have_tc = have_td = 0;
 
   if (have_ta) {
-    es_fprintf(fp, "TA2: (PTS) %stoggle, %splicit, T=%02X\n",
-               (*atr & 0x80) ? "no-" : "", (*atr & 0x10) ? "im" : "ex",
-               (*atr & 0x0f));
+    fp << boost::format("TA2: (PTS) %stoggle, %splicit, T=%02X\n") %
+              ((*atr & 0x80) ? "no-" : "") % ((*atr & 0x10) ? "im" : "ex") %
+              (*atr & 0x0f);
     if ((*atr & 0x60))
-      es_fprintf(fp, "note: reserved bits are set (TA2=0x%02X)\n", *atr);
+      fp << boost::format("note: reserved bits are set (TA2=0x%02X)\n") % *atr;
     if (!--atrlen) goto bailout;
     atr++;
   }
 
   if (have_tb) {
-    es_fprintf(fp, "TB2: PI2=%d\n", *atr);
+    fp << boost::format("TB2: PI2=%d\n") % *atr;
     if (!--atrlen) goto bailout;
     atr++;
   }
 
   if (have_tc) {
-    es_fprintf(fp, "TC2: PWI=%d\n", *atr);
+    fp << boost::format("TC2: PWI=%d\n") % *atr;
     if (!--atrlen) goto bailout;
     atr++;
   }
@@ -166,10 +168,10 @@ char *atr_dump(const void *buffer, size_t buflen) {
     have_tb = !!(*atr & 0x20);
     have_tc = !!(*atr & 0x40);
     have_td = !!(*atr & 0x80);
-    es_fprintf(fp, "TD2: protocol T%d supported\n", *atr & 0x0f);
+    fp << boost::format("TD2: protocol T%d supported\n") % (*atr & 0x0f);
 
     if (have_ta + have_tb + have_tc + have_td + n_historical > atrlen)
-      es_fputs("error: ATR shorter than indicated by format character\n", fp);
+      fp << "error: ATR shorter than indicated by format character\n";
 
     if (!--atrlen) goto bailout;
     atr++;
@@ -178,20 +180,20 @@ char *atr_dump(const void *buffer, size_t buflen) {
 
   for (idx = 3; have_ta || have_tb || have_tc || have_td; idx++) {
     if (have_ta) {
-      es_fprintf(fp, "TA%d: IFSC=%d\n", idx, *atr);
+      fp << boost::format("TA%d: IFSC=%d\n") % idx % ((int)*atr);
       if (!--atrlen) goto bailout;
       atr++;
     }
 
     if (have_tb) {
-      es_fprintf(fp, "TB%d: BWI=%d CWI=%d\n", idx, (*atr >> 4) & 0x0f,
-                 *atr & 0x0f);
+      fp << boost::format("TB%d: BWI=%d CWI=%d\n") % idx %
+                ((int)(*atr >> 4) & 0x0f) % ((int)(*atr & 0x0f));
       if (!--atrlen) goto bailout;
       atr++;
     }
 
     if (have_tc) {
-      es_fprintf(fp, "TC%d: 0x%02X\n", idx, *atr);
+      fp << boost::format("TC%d: 0x%02X\n") % idx % *atr;
       if (!--atrlen) goto bailout;
       atr++;
     }
@@ -201,13 +203,11 @@ char *atr_dump(const void *buffer, size_t buflen) {
       have_tb = !!(*atr & 0x20);
       have_tc = !!(*atr & 0x40);
       have_td = !!(*atr & 0x80);
-      es_fprintf(fp, "TD%d: protocol T%d supported\n", idx, *atr & 0x0f);
+      fp << boost::format("TD%d: protocol T%d supported\n") % idx %
+                ((int)(*atr & 0x0f));
 
       if (have_ta + have_tb + have_tc + have_td + n_historical > atrlen)
-        es_fputs(
-            "error: "
-            "ATR shorter than indicated by format character\n",
-            fp);
+        fp << "error: ATR shorter than indicated by format character\n";
 
       if (!--atrlen) goto bailout;
       atr++;
@@ -216,36 +216,28 @@ char *atr_dump(const void *buffer, size_t buflen) {
   }
 
   if (n_historical + 1 > atrlen)
-    es_fputs(
-        "error: ATR shorter than required for historical bytes "
-        "and checksum\n",
-        fp);
+    fp << "error: ATR shorter than required for historical bytes and "
+          "checksum\n";
 
   if (n_historical) {
-    es_fputs("HCH:", fp);
+    fp << "HCH:";
     for (; n_historical && atrlen; n_historical--, atrlen--, atr++)
-      es_fprintf(fp, " %02X", *atr);
-    es_putc('\n', fp);
+      fp << boost::format(" %02X") % *atr;
+    fp << '\n';
   }
 
   if (!atrlen)
-    es_fputs("error: checksum missing\n", fp);
+    fp << "error: checksum missing\n";
   else if (*atr == chksum)
-    es_fprintf(fp, "TCK: %02X (good)\n", *atr);
+    fp << boost::format("TCK: %02X (good)\n") % *atr;
   else
-    es_fprintf(fp, "TCK: %02X (bad; computed %02X)\n", *atr, chksum);
+    fp << boost::format("TCK: %02X (bad; computed %02X)\n") % *atr % chksum;
 
   atrlen--;
   if (atrlen)
-    es_fprintf(fp, "error: %u bytes garbage at end of ATR\n",
-               (unsigned int)atrlen);
+    fp << boost::format("error: %u bytes garbage at end of ATR\n") %
+              (unsigned int)atrlen;
 
 bailout:
-  es_putc('\0', fp); /* We want a string.  */
-  if (es_fclose_snatch(fp, (void **)&result, NULL)) {
-    log_error("oops: es_fclose_snatch failed: %s\n", strerror(errno));
-    return NULL;
-  }
-
-  return result;
+  return xstrdup(fp.str().c_str());
 }
