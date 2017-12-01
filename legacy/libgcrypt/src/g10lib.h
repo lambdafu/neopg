@@ -94,8 +94,6 @@
 gpg_error_t _gcry_vcontrol(enum gcry_ctl_cmds cmd, va_list arg_ptr);
 int _gcry_get_debug_flag(unsigned int mask);
 
-char *_gcry_get_config(int mode, const char *what);
-
 /* Malloc functions and common wrapper macros.  */
 void *_gcry_malloc(size_t n) _GCRY_GCC_ATTR_MALLOC;
 void *_gcry_calloc(size_t n, size_t m) _GCRY_GCC_ATTR_MALLOC;

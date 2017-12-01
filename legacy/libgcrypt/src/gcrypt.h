@@ -152,7 +152,6 @@ enum gcry_ctl_cmds {
   GCRYCTL_SET_CBC_CTS = 41,
   GCRYCTL_SET_CBC_MAC = 42,
   GCRYCTL_SET_THREAD_CBS = 47,
-  GCRYCTL_PRINT_CONFIG = 53,
   /* Note: 58 .. 62 are used internally.  */
   GCRYCTL_DISABLE_HWF = 63,
   GCRYCTL_DISABLE_LOCKED_SECMEM = 67,
@@ -1395,8 +1394,6 @@ void gcry_log_debugmpi(const char *text, gcry_mpi_t mpi);
 void gcry_log_debugpnt(const char *text, gcry_mpi_point_t point,
                        gcry_ctx_t ctx);
 void gcry_log_debugsxp(const char *text, gcry_sexp_t sexp);
-
-char *gcry_get_config(int mode, const char *what);
 
 /* Log levels used by the internal logging facility. */
 enum gcry_log_levels {

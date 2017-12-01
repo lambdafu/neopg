@@ -184,54 +184,6 @@ static void print_config(const char *what, gpgrt_stream_t fp) {
   }
 }
 
-/* With a MODE of 0 return a malloced string with configured features.
- * In that case a WHAT of NULL returns everything in the same way
- * GCRYCTL_PRINT_CONFIG would do.  With a specific WHAT string only
- * the requested feature is returned (w/o the trailing LF.  On error
- * NULL is returned.  */
-char *_gcry_get_config(int mode, const char *what) {
-  gpgrt_stream_t fp;
-  int save_errno;
-  void *data;
-  char *p;
-
-  if (mode) {
-    gpg_err_set_errno(EINVAL);
-    return NULL;
-  }
-
-  fp = gpgrt_fopenmem(0, "w+b");
-  if (!fp) return NULL;
-
-  print_config(what, fp);
-  if (gpgrt_ferror(fp)) {
-    save_errno = errno;
-    gpgrt_fclose(fp);
-    gpg_err_set_errno(save_errno);
-    return NULL;
-  }
-
-  gpgrt_rewind(fp);
-  if (gpgrt_fclose_snatch(fp, &data, NULL)) {
-    save_errno = errno;
-    gpgrt_fclose(fp);
-    gpg_err_set_errno(save_errno);
-    return NULL;
-  }
-
-  if (!data) {
-    /* Nothing was printed (unknown value for WHAT).  This is okay,
-     * so clear ERRNO to indicate this. */
-    gpg_err_set_errno(0);
-    return NULL;
-  }
-
-  /* Strip trailing LF.  */
-  if (what && (p = strchr((char *)data, '\n'))) *p = 0;
-
-  return (char *)data;
-}
-
 /* Command dispatcher function, acting as general control
    function.  */
 gpg_error_t _gcry_vcontrol(enum gcry_ctl_cmds cmd, va_list arg_ptr) {
@@ -330,23 +282,6 @@ gpg_error_t _gcry_vcontrol(enum gcry_ctl_cmds cmd, va_list arg_ptr) {
          library here. */
       global_init();
       break;
-
-    /* This command dumps information pertaining to the
-       configuration of libgcrypt to the given stream.  It may be
-       used before the initialization has been finished but not
-       before a gcry_version_check.  See also gcry_get_config.  */
-    case GCRYCTL_PRINT_CONFIG: {
-      FILE *fp = va_arg(arg_ptr, FILE *);
-      char *tmpstr;
-      tmpstr = _gcry_get_config(0, NULL);
-      if (tmpstr) {
-        if (fp)
-          fputs(tmpstr, fp);
-        else
-          log_info("%s", tmpstr);
-        xfree(tmpstr);
-      }
-    } break;
 
     case GCRYCTL_DISABLE_HWF: {
       const char *name = va_arg(arg_ptr, const char *);
