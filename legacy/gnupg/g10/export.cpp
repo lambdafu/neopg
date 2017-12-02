@@ -1544,8 +1544,7 @@ static int do_export_stream(ctrl_t ctrl, iobuf_t out,
     }
 
     /* And write it. */
-    err = do_export_one_keyblock(ctrl, keyblock, keyid,
-                                 out, secret, options,
+    err = do_export_one_keyblock(ctrl, keyblock, keyid, out, secret, options,
                                  stats, any, desc, ndesc, descindex);
     if (err) break;
 

@@ -1617,67 +1617,6 @@ int keyserver_fetch(ctrl_t ctrl, const std::vector<std::string> &urilist) {
   return 0;
 }
 
-/* Import key in a CERT or pointed to by a CERT.  */
-int keyserver_import_cert(ctrl_t ctrl, const char *name,
-                          unsigned char **fpr, size_t *fpr_len) {
-  gpg_error_t err;
-  char *look, *url;
-  estream_t key;
-
-  look = xstrdup(name);
-
-  char *domain = strrchr(look, '@');
-  if (domain) *domain = '.';
-
-  err = gpg_dirmngr_dns_cert(ctrl, look, "*", &key, fpr,
-                             fpr_len, &url);
-  if (err)
-    ;
-  else if (key) {
-    int armor_status = opt.no_armor;
-
-    /* CERT records are always in binary format */
-    opt.no_armor = 1;
-
-    err = import_keys_es_stream(
-        ctrl, key, NULL, fpr, fpr_len,
-        (opt.keyserver_options.import_options | IMPORT_NO_SECKEY), NULL, NULL);
-
-    opt.no_armor = armor_status;
-
-    es_fclose(key);
-    key = NULL;
-  } else if (*fpr) {
-    /* We only consider the IPGP type if a fingerprint was provided.
-       This lets us select the right key regardless of what a URL
-       points to, or get the key from a keyserver. */
-    if (url) {
-      struct keyserver_spec *spec;
-
-      spec = parse_keyserver_uri(url, 1);
-      if (spec) {
-        err = keyserver_import_fprint(ctrl, *fpr, *fpr_len, spec, 0);
-        free_keyserver_spec(spec);
-      }
-    } else if (keyserver_any_configured(ctrl)) {
-      /* If only a fingerprint is provided, try and fetch it from
-         the configured keyserver. */
-
-      err = keyserver_import_fprint(ctrl, *fpr, *fpr_len, opt.keyserver, 0);
-    } else
-      log_info(_("no keyserver known\n"));
-
-    /* Give a better string here? "CERT fingerprint for \"%s\"
-       found, but no keyserver" " known (use option
-       --keyserver)\n" ? */
-  }
-
-  xfree(url);
-  xfree(look);
-
-  return err;
-}
-
 /* Import a key using the Web Key Directory protocol.  */
 gpg_error_t keyserver_import_wkd(ctrl_t ctrl, const char *name, int quick,
                                  unsigned char **fpr, size_t *fpr_len) {

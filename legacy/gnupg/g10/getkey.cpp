@@ -1136,13 +1136,6 @@ int get_pubkey_byname(ctrl_t ctrl, GETKEY_CTX *retctx, PKT_public_key *pk,
                           include_unusable, ret_keyblock, ret_kdbhd);
           break;
 
-        case AKL_CERT:
-          mechanism = "DNS CERT";
-          glo_ctrl.in_auto_key_retrieve++;
-          rc = keyserver_import_cert(ctrl, name, &fpr, &fpr_len);
-          glo_ctrl.in_auto_key_retrieve--;
-          break;
-
         case AKL_WKD:
           mechanism = "WKD";
           glo_ctrl.in_auto_key_retrieve++;

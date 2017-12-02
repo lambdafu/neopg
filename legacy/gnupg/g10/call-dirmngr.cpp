@@ -69,14 +69,6 @@ struct ks_put_parm_s {
   size_t datalen;    /* The length of DATA.  */
 };
 
-/* Parameter structure used with the DNS_CERT command.  */
-struct dns_cert_parm_s {
-  estream_t memfp;
-  unsigned char *fpr;
-  size_t fprlen;
-  char *url;
-};
-
 /* Data used to associate an session with dirmngr contexts.  We can't
    use a simple one to one mapping because we sometimes need two
    connections to the dirmngr; for example while doing a listing and
@@ -863,10 +855,17 @@ gpg_error_t gpg_dirmngr_ks_put(ctrl_t ctrl, void *data, size_t datalen,
   return err;
 }
 
-/* Data callback for the DNS_CERT and WKD_GET commands. */
-static gpg_error_t dns_cert_data_cb(void *opaque, const void *data,
-                                    size_t datalen) {
-  struct dns_cert_parm_s *parm = (dns_cert_parm_s *)opaque;
+/* Parameter structure used with the WKD_GET command.  */
+struct wkd_parm_s {
+  estream_t memfp;
+  unsigned char *fpr;
+  size_t fprlen;
+  char *url;
+};
+
+/* Data callback for the WKD_GET commands. */
+static gpg_error_t wkd_data_cb(void *opaque, const void *data, size_t datalen) {
+  struct wkd_parm_s *parm = (wkd_parm_s *)opaque;
   gpg_error_t err = 0;
   size_t nwritten;
 
@@ -879,119 +878,6 @@ static gpg_error_t dns_cert_data_cb(void *opaque, const void *data,
   return err;
 }
 
-/* Status callback for the DNS_CERT command.  */
-static gpg_error_t dns_cert_status_cb(void *opaque, const char *line) {
-  struct dns_cert_parm_s *parm = (dns_cert_parm_s *)opaque;
-  gpg_error_t err = 0;
-  const char *s;
-  size_t nbytes;
-
-  if ((s = has_leading_keyword(line, "FPR"))) {
-    char *buf;
-
-    if (!(buf = xtrystrdup(s)))
-      err = gpg_error_from_syserror();
-    else if (parm->fpr)
-      err = GPG_ERR_DUP_KEY;
-    else if (!hex2str(buf, buf, strlen(buf) + 1, &nbytes))
-      err = gpg_error_from_syserror();
-    else if (nbytes < 20)
-      err = GPG_ERR_TOO_SHORT;
-    else {
-      parm->fpr = (unsigned char *)xtrymalloc(nbytes);
-      if (!parm->fpr)
-        err = gpg_error_from_syserror();
-      else
-        memcpy(parm->fpr, buf, (parm->fprlen = nbytes));
-    }
-    xfree(buf);
-  } else if ((s = has_leading_keyword(line, "URL")) && *s) {
-    if (parm->url)
-      err = GPG_ERR_DUP_KEY;
-    else if (!(parm->url = xtrystrdup(s)))
-      err = gpg_error_from_syserror();
-  }
-
-  return err;
-}
-
-/* Ask the dirmngr for a DNS CERT record.  Depending on the found
-   subtypes different return values are set:
-
-   - For a PGP subtype a new estream with that key will be returned at
-     R_KEY and the other return parameters are set to NULL/0.
-
-   - For an IPGP subtype the fingerprint is stored as a malloced block
-     at (R_FPR,R_FPRLEN).  If an URL is available it is stored as a
-     malloced string at R_URL; NULL is stored if there is no URL.
-
-   If CERTTYPE is DNS_CERTTYPE_ANY this function returns the first
-   CERT record found with a supported type; it is expected that only
-   one CERT record is used.  If CERTTYPE is one of the supported
-   certtypes, only records with this certtype are considered and the
-   first one found is returned.  All R_* args are optional.
- */
-gpg_error_t gpg_dirmngr_dns_cert(ctrl_t ctrl, const char *name,
-                                 const char *certtype, estream_t *r_key,
-                                 unsigned char **r_fpr, size_t *r_fprlen,
-                                 char **r_url) {
-  gpg_error_t err;
-  assuan_context_t ctx;
-  struct dns_cert_parm_s parm;
-  std::string line;
-
-  memset(&parm, 0, sizeof parm);
-  if (r_key) *r_key = NULL;
-  if (r_fpr) *r_fpr = NULL;
-  if (r_fprlen) *r_fprlen = 0;
-  if (r_url) *r_url = NULL;
-
-  err = open_context(ctrl, &ctx);
-  if (err) return err;
-
-  line = "DNS_CERT ";
-  line += certtype;
-  line += " ";
-  line += name;
-  if (line.size() + 2 >= ASSUAN_LINELENGTH) {
-    err = GPG_ERR_TOO_LARGE;
-    goto leave;
-  }
-
-  parm.memfp = es_fopenmem(0, "rwb");
-  if (!parm.memfp) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
-  err = assuan_transact(ctx, line.c_str(), dns_cert_data_cb, &parm, NULL, NULL,
-                        dns_cert_status_cb, &parm);
-  if (err) goto leave;
-
-  if (r_key) {
-    es_rewind(parm.memfp);
-    *r_key = parm.memfp;
-    parm.memfp = NULL;
-  }
-
-  if (r_fpr && parm.fpr) {
-    *r_fpr = parm.fpr;
-    parm.fpr = NULL;
-  }
-  if (r_fprlen) *r_fprlen = parm.fprlen;
-
-  if (r_url && parm.url) {
-    *r_url = parm.url;
-    parm.url = NULL;
-  }
-
-leave:
-  xfree(parm.fpr);
-  xfree(parm.url);
-  es_fclose(parm.memfp);
-  close_context(ctrl, ctx);
-  return err;
-}
-
 /* Ask the dirmngr to retrieve a key via the Web Key Directory
  * protocol.  If QUICK is set the dirmngr is advised to use a shorter
  * timeout.  On success a new estream with the key is stored at R_KEY.
@@ -1000,7 +886,7 @@ gpg_error_t gpg_dirmngr_wkd_get(ctrl_t ctrl, const char *name, int quick,
                                 estream_t *r_key) {
   gpg_error_t err;
   assuan_context_t ctx;
-  struct dns_cert_parm_s parm;
+  struct wkd_parm_s parm;
   std::string line;
 
   memset(&parm, 0, sizeof parm);
@@ -1022,8 +908,8 @@ gpg_error_t gpg_dirmngr_wkd_get(ctrl_t ctrl, const char *name, int quick,
     err = gpg_error_from_syserror();
     goto leave;
   }
-  err = assuan_transact(ctx, line.c_str(), dns_cert_data_cb, &parm, NULL, NULL,
-                        NULL, &parm);
+  err = assuan_transact(ctx, line.c_str(), wkd_data_cb, &parm, NULL, NULL, NULL,
+                        &parm);
   if (err) goto leave;
 
   if (r_key) {

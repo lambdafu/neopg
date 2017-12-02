@@ -470,95 +470,6 @@ static gpg_error_t option_handler(assuan_context_t ctx, const char *key,
   return err;
 }
 
-static const char hlp_dns_cert[] =
-    "DNS_CERT <subtype> <name>\n"
-    "\n"
-    "Return the CERT record for <name>.  <subtype> is one of\n"
-    "  *     Return the first record of any supported subtype\n"
-    "  PGP   Return the first record of subtype PGP (3)\n"
-    "  IPGP  Return the first record of subtype IPGP (6)\n"
-    "If the content of a certificate is available (PGP) it is returned\n"
-    "by data lines.  Fingerprints and URLs are returned via status lines.\n";
-static gpg_error_t cmd_dns_cert(assuan_context_t ctx, char *line) {
-  /* ctrl_t ctrl = assuan_get_pointer (ctx); */
-  gpg_error_t err = 0;
-  char *mbox = NULL;
-  char *namebuf = NULL;
-  char *encodedhash = NULL;
-  const char *name;
-  int certtype;
-  char *p;
-  void *key = NULL;
-  size_t keylen;
-  unsigned char *fpr = NULL;
-  size_t fprlen;
-  char *url = NULL;
-
-  line = skip_options(line);
-
-  {
-    p = strchr(line, ' ');
-    if (!p) {
-      err = PARM_ERROR("missing arguments");
-      goto leave;
-    }
-    *p++ = 0;
-    if (!strcmp(line, "*"))
-      certtype = DNS_CERTTYPE_ANY;
-    else if (!strcmp(line, "IPGP"))
-      certtype = DNS_CERTTYPE_IPGP;
-    else if (!strcmp(line, "PGP"))
-      certtype = DNS_CERTTYPE_PGP;
-    else {
-      err = PARM_ERROR("unknown subtype");
-      goto leave;
-    }
-    while (spacep(p)) p++;
-    line = p;
-    if (!*line) {
-      err = PARM_ERROR("name missing");
-      goto leave;
-    }
-  }
-
-  name = line;
-
-  err = get_dns_cert(name, certtype, &key, &keylen, &fpr, &fprlen, &url);
-  if (err) goto leave;
-
-  if (key) {
-    err = data_line_write(ctx, key, keylen);
-    if (err) goto leave;
-  }
-
-  if (fpr) {
-    char *tmpstr;
-
-    tmpstr = bin2hex(fpr, fprlen, NULL);
-    if (!tmpstr)
-      err = gpg_error_from_syserror();
-    else {
-      err = assuan_write_status(ctx, "FPR", tmpstr);
-      xfree(tmpstr);
-    }
-    if (err) goto leave;
-  }
-
-  if (url) {
-    err = assuan_write_status(ctx, "URL", url);
-    if (err) goto leave;
-  }
-
-leave:
-  xfree(key);
-  xfree(fpr);
-  xfree(url);
-  xfree(mbox);
-  xfree(namebuf);
-  xfree(encodedhash);
-  return leave_cmd(ctx, err);
-}
-
 static const char hlp_wkd_get[] =
     "WKD_GET [--submission-address|--policy-flags] <user_id>\n"
     "\n"
@@ -1755,8 +1666,7 @@ static int register_commands(assuan_context_t ctx) {
     const char *name;
     assuan_handler_t handler;
     const char *const help;
-  } table[] = {{"DNS_CERT", cmd_dns_cert, hlp_dns_cert},
-               {"WKD_GET", cmd_wkd_get, hlp_wkd_get},
+  } table[] = {{"WKD_GET", cmd_wkd_get, hlp_wkd_get},
                {"ISVALID", cmd_isvalid, hlp_isvalid},
                {"CHECKCRL", cmd_checkcrl, hlp_checkcrl},
                {"CHECKOCSP", cmd_checkocsp, hlp_checkocsp},

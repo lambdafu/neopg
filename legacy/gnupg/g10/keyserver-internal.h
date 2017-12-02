@@ -44,8 +44,8 @@ gpg_error_t keyserver_refresh(ctrl_t ctrl,
 gpg_error_t keyserver_search(ctrl_t ctrl,
                              const std::vector<std::string> &tokens);
 int keyserver_fetch(ctrl_t ctrl, const std::vector<std::string> &urilist);
-int keyserver_import_cert(ctrl_t ctrl, const char *name,
-                          unsigned char **fpr, size_t *fpr_len);
+int keyserver_import_cert(ctrl_t ctrl, const char *name, unsigned char **fpr,
+                          size_t *fpr_len);
 gpg_error_t keyserver_import_wkd(ctrl_t ctrl, const char *name, int quick,
                                  unsigned char **fpr, size_t *fpr_len);
 int keyserver_import_name(ctrl_t ctrl, const char *name, unsigned char **fpr,

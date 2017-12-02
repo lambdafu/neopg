@@ -43,7 +43,6 @@ int main(int argc, char **argv) {
   int last_argc = -1;
   gpg_error_t err;
   int any_options = 0;
-  int opt_cert = 0;
   int opt_srv = 0;
   int opt_bracket = 0;
   int opt_cname = 0;
@@ -97,10 +96,6 @@ int main(int argc, char **argv) {
       opt_bracket = 1;
       argc--;
       argv++;
-    } else if (!strcmp(*argv, "--cert")) {
-      any_options = opt_cert = 1;
-      argc--;
-      argv++;
     } else if (!strcmp(*argv, "--srv")) {
       any_options = opt_srv = 1;
       argc--;
@@ -123,10 +118,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (!argc && !any_options) {
-    opt_cert = 1;
-    name = "simon.josefsson.org";
-  } else if (argc == 1)
+  if (argc == 1)
     name = *argv;
   else {
     fprintf(stderr, PGM ": none or too many host names given\n");
@@ -136,43 +128,7 @@ int main(int argc, char **argv) {
   set_dns_verbose(verbose, debug);
   init_sockets();
 
-  if (opt_cert) {
-    unsigned char *fpr;
-    size_t fpr_len;
-    char *url;
-    void *key;
-    size_t keylen;
-
-    if (verbose || any_options) printf("CERT lookup on '%s'\n", name);
-
-    err = get_dns_cert(name, DNS_CERTTYPE_ANY, &key, &keylen, &fpr, &fpr_len,
-                       &url);
-    if (err)
-      printf("get_dns_cert failed: %s <%s>\n", gpg_strerror(err),
-             gpg_strsource(err));
-    else if (key) {
-      if (verbose || any_options)
-        printf("Key found (%u bytes)\n", (unsigned int)keylen);
-    } else {
-      if (fpr) {
-        int i;
-
-        printf("Fingerprint found (%d bytes): ", (int)fpr_len);
-        for (i = 0; i < fpr_len; i++) printf("%02X", fpr[i]);
-        putchar('\n');
-      } else
-        printf("No fingerprint found\n");
-
-      if (url)
-        printf("URL found: %s\n", url);
-      else
-        printf("No URL found\n");
-    }
-
-    xfree(key);
-    xfree(fpr);
-    xfree(url);
-  } else if (opt_cname) {
+  if (opt_cname) {
     char *cname;
 
     printf("CNAME lookup on '%s'\n", name);
