@@ -172,17 +172,6 @@ struct revocation_key {
   byte fpr[MAX_FINGERPRINT_LEN];
 };
 
-/* Object to keep information about a PKA DNS record. */
-typedef struct {
-  int valid;             /* An actual PKA record exists for EMAIL. */
-  int checked;           /* Set to true if the FPR has been checked against the
-                            actual key. */
-  char *uri;             /* Malloced string with the URI. NULL if the URI is
-                            not available.*/
-  unsigned char fpr[20]; /* The fingerprint as stored in the PKA RR. */
-  char email[1];         /* The email address from the notation data. */
-} pka_info_t;
-
 /* A signature packet (RFC 4880, Section 5.2).  Only a subset of these
    fields are directly serialized (these are marked as such); the rest
    are read from the subpackets, which are not synthesized when
@@ -200,7 +189,6 @@ typedef struct {
     unsigned notation : 1;   /* At least one notation is present */
     unsigned pref_ks : 1;    /* At least one preferred keyserver is present */
     unsigned expired : 1;
-    unsigned pka_tried : 1; /* Set if we tried to retrieve the PKA record. */
   } flags;
   /* The key that allegedly generated this signature.  (Directly
      serialized in v3 sigs; for v4 sigs, this must be explicitly added
@@ -227,8 +215,6 @@ typedef struct {
   const byte *trust_regexp;
   struct revocation_key *revkey;
   int numrevkeys;
-  pka_info_t *pka_info;   /* Malloced PKA data or NULL if not
-                             available.  See also flags.pka_tried. */
   char *signers_uid;      /* Malloced value of the SIGNERS_UID
                            * subpacket or NULL.  This string has
                            * already been sanitized.  */

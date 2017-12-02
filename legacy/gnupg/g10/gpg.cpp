@@ -330,7 +330,6 @@ enum cmd_and_opt_values {
   oEnableDSA2,
   oDisableDSA2,
   oFakedSystemTime,
-  oPrintPKARecords,
   oPrintDANERecords,
   oDefaultNewKeyAlgo,
   oWeakDigest,
@@ -625,7 +624,6 @@ const static ARGPARSE_OPTS opts[] = {
     ARGPARSE_s_n(oAllowFreeformUID, "allow-freeform-uid", "@"),
     ARGPARSE_s_n(oNoAllowFreeformUID, "no-allow-freeform-uid", "@"),
     ARGPARSE_s_n(oListOnly, "list-only", "@"),
-    ARGPARSE_s_n(oPrintPKARecords, "print-pka-records", "@"),
     ARGPARSE_s_n(oPrintDANERecords, "print-dane-records", "@"),
     ARGPARSE_s_n(oIgnoreTimeConflict, "ignore-time-conflict", "@"),
     ARGPARSE_s_n(oIgnoreValidFrom, "ignore-valid-from", "@"),
@@ -2316,10 +2314,6 @@ next_pass:
              N_("show revoked and expired user IDs in signature verification")},
             {"show-primary-uid-only", VERIFY_SHOW_PRIMARY_UID_ONLY, NULL,
              N_("show only the primary user ID in signature verification")},
-            {"pka-lookups", VERIFY_PKA_LOOKUPS, NULL,
-             N_("validate signatures with PKA data")},
-            {"pka-trust-increase", VERIFY_PKA_TRUST_INCREASE, NULL,
-             N_("elevate the trust of signatures with valid PKA data")},
             {NULL, 0, NULL, NULL}};
 
         if (!parse_options(pargs.r.ret_str, &opt.verify_options, vopts, 1)) {

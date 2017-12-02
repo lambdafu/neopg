@@ -176,7 +176,6 @@ static struct {
     {"2.16.840.1.113730.1.13", "netscape-comment"},
 
     /* GnuPG extensions */
-    {"1.3.6.1.4.1.11591.2.1.1", "pkaAddress"},
     {"1.3.6.1.4.1.11591.2.2.1", "standaloneCertificate"},
     {"1.3.6.1.4.1.11591.2.2.2", "wellKnownPrivateKey"},
 

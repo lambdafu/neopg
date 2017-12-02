@@ -1143,13 +1143,6 @@ int get_pubkey_byname(ctrl_t ctrl, GETKEY_CTX *retctx, PKT_public_key *pk,
           glo_ctrl.in_auto_key_retrieve--;
           break;
 
-        case AKL_PKA:
-          mechanism = "PKA";
-          glo_ctrl.in_auto_key_retrieve++;
-          rc = keyserver_import_pka(ctrl, name, &fpr, &fpr_len);
-          glo_ctrl.in_auto_key_retrieve--;
-          break;
-
         case AKL_DANE:
           mechanism = "DANE";
           glo_ctrl.in_auto_key_retrieve++;
@@ -1202,7 +1195,7 @@ int get_pubkey_byname(ctrl_t ctrl, GETKEY_CTX *retctx, PKT_public_key *pk,
       /* Use the fingerprint of the key that we actually fetched.
        * This helps prevent problems where the key that we fetched
        * doesn't have the same name that we used to fetch it.  In
-       * the case of CERT and PKA, this is an actual security
+       * the case of CERT, this is an actual security
        * requirement as the URL might point to a key put in by an
        * attacker.  By forcing the use of the fingerprint, we
        * won't use the attacker's key here. */
@@ -3588,8 +3581,6 @@ int parse_auto_key_locate(char *options) {
       akl->type = AKL_KEYSERVER;
     else if (ascii_strcasecmp(tok, "cert") == 0)
       akl->type = AKL_CERT;
-    else if (ascii_strcasecmp(tok, "pka") == 0)
-      akl->type = AKL_PKA;
     else if (ascii_strcasecmp(tok, "dane") == 0)
       akl->type = AKL_DANE;
     else if (ascii_strcasecmp(tok, "wkd") == 0)
