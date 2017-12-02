@@ -930,8 +930,6 @@ static gpg_error_t dns_cert_status_cb(void *opaque, const char *line) {
    one CERT record is used.  If CERTTYPE is one of the supported
    certtypes, only records with this certtype are considered and the
    first one found is returned.  All R_* args are optional.
-
-   If CERTTYPE is NULL the DANE method is used to fetch the key.
  */
 gpg_error_t gpg_dirmngr_dns_cert(ctrl_t ctrl, const char *name,
                                  const char *certtype, estream_t *r_key,
@@ -952,7 +950,7 @@ gpg_error_t gpg_dirmngr_dns_cert(ctrl_t ctrl, const char *name,
   if (err) return err;
 
   line = "DNS_CERT ";
-  line += (certtype ? certtype : "--dane");
+  line += certtype;
   line += " ";
   line += name;
   if (line.size() + 2 >= ASSUAN_LINELENGTH) {

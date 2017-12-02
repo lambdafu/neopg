@@ -56,7 +56,6 @@ enum {
   AKL_NODEFAULT,
   AKL_LOCAL,
   AKL_CERT,
-  AKL_DANE,
   AKL_WKD,
   AKL_LDAP,
   AKL_KEYSERVER,
@@ -137,7 +136,6 @@ extern int memory_stat_debug_mode;
 #define EXPORT_RESET_SUBKEY_PASSWD (1 << 3)
 #define EXPORT_MINIMAL (1 << 4)
 #define EXPORT_CLEAN (1 << 5)
-#define EXPORT_DANE_FORMAT (1 << 7)
 #define EXPORT_BACKUP (1 << 10)
 
 #define LIST_SHOW_POLICY_URLS (1 << 1)

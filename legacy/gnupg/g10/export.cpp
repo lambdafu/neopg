@@ -75,9 +75,6 @@ static int do_export_stream(ctrl_t ctrl, iobuf_t out,
                             const std::vector<std::string> &users, int secret,
                             kbnode_t *keyblock_out, unsigned int options,
                             export_stats_t stats, int *any);
-static gpg_error_t print_dane_records
-    /**/ (iobuf_t out, kbnode_t keyblock, PKT_public_key *pk, const void *data,
-          size_t datalen, int print_dane);
 
 static void cleanup_export_globals(void) {
   recsel_release(export_keep_uid);
@@ -101,8 +98,6 @@ int parse_export_options(char *str, unsigned int *options, int noisy) {
       {"export-minimal", EXPORT_MINIMAL | EXPORT_CLEAN, NULL,
        N_("remove as much as possible from key during export")},
 
-      {"export-dane", EXPORT_DANE_FORMAT, NULL, NULL},
-
       {"backup", EXPORT_BACKUP, NULL, N_("use the GnuPG key backup format")},
       {"export-backup", EXPORT_BACKUP, NULL, NULL},
 
@@ -124,8 +119,7 @@ int parse_export_options(char *str, unsigned int *options, int noisy) {
     /* Alter other options we want or don't want for restore.  */
     *options |=
         (EXPORT_LOCAL_SIGS | EXPORT_ATTRIBUTES | EXPORT_SENSITIVE_REVKEYS);
-    *options &= ~(EXPORT_CLEAN | EXPORT_MINIMAL |
-                  EXPORT_DANE_FORMAT);
+    *options &= ~(EXPORT_CLEAN | EXPORT_MINIMAL);
   }
   return rc;
 }
@@ -301,7 +295,7 @@ static int do_export(ctrl_t ctrl, const std::vector<std::string> &users,
   rc = open_outfile(-1, NULL, 0, !!secret, &out);
   if (rc) return rc;
 
-  if (opt.armor && !(options & (EXPORT_DANE_FORMAT))) {
+  if (opt.armor) {
     afx = new_armor_context();
     afx->what = secret ? 5 : 1;
     push_armor_filter(afx, out);
@@ -1049,7 +1043,6 @@ gpg_error_t write_keyblock_to_output(kbnode_t keyblock, int with_armor,
   iobuf_t out;
   kbnode_t node;
   armor_filter_context_t *afx = NULL;
-  iobuf_t out_help = NULL;
   PKT_public_key *pk = NULL;
 
   fname = opt.outfile ? opt.outfile->c_str() : "-";
@@ -1063,11 +1056,6 @@ gpg_error_t write_keyblock_to_output(kbnode_t keyblock, int with_armor,
   }
   if (opt.verbose)
     log_info(_("writing to '%s'\n"), iobuf_get_fname_nonnull(out));
-
-  if ((options & (EXPORT_DANE_FORMAT))) {
-    with_armor = 0;
-    out_help = iobuf_temp();
-  }
 
   if (with_armor) {
     afx = new_armor_context();
@@ -1085,9 +1073,9 @@ gpg_error_t write_keyblock_to_output(kbnode_t keyblock, int with_armor,
       pk = node->pkt->pkt.public_key;
 
     if ((options & EXPORT_BACKUP))
-      err = build_packet_and_meta(out_help ? out_help : out, node->pkt);
+      err = build_packet_and_meta(out, node->pkt);
     else
-      err = build_packet(out_help ? out_help : out, node->pkt);
+      err = build_packet(out, node->pkt);
     if (err) {
       log_error("build_packet(%d) failed: %s\n", node->pkt->pkttype,
                 gpg_strerror(err));
@@ -1096,24 +1084,11 @@ gpg_error_t write_keyblock_to_output(kbnode_t keyblock, int with_armor,
   }
   err = 0;
 
-  if (out_help && pk) {
-    const void *data;
-    size_t datalen;
-
-    iobuf_flush_temp(out_help);
-    data = iobuf_get_temp_buffer(out_help);
-    datalen = iobuf_get_temp_length(out_help);
-
-    err = print_dane_records(out, keyblock, pk, data, datalen,
-			     (options & EXPORT_DANE_FORMAT));
-  }
-
 leave:
   if (err)
     iobuf_cancel(out);
   else
     iobuf_close(out);
-  iobuf_cancel(out_help);
   release_armor_context(afx);
   return err;
 }
@@ -1180,100 +1155,6 @@ static void apply_drop_subkey_filter(ctrl_t ctrl, kbnode_t keyblock,
       }
     }
   }
-}
-
-/* Print DANE records for all user IDs in KEYBLOCK to OUT.  The
- * data for the record is taken from (DATA,DATELEN).  PK is the public
- * key packet with the primary key. */
-static gpg_error_t print_dane_records(iobuf_t out, kbnode_t keyblock,
-                                             PKT_public_key *pk,
-                                             const void *data, size_t datalen,
-                                             int print_dane) {
-  gpg_error_t err = 0;
-  kbnode_t kbctx, node;
-  PKT_user_id *uid;
-  char *mbox = NULL;
-  char *hash = NULL;
-  char *domain;
-  const char *s;
-  unsigned int len;
-  estream_t fp = NULL;
-  char *hexdata = NULL;
-  char *hexfpr;
-
-  hexfpr = hexfingerprint(pk, NULL, 0);
-  hexdata = bin2hex(data, datalen, NULL);
-  if (!hexdata) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
-  ascii_strlwr(hexdata);
-  fp = es_fopenmem(0, "rw");
-  if (!fp) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
-
-  for (kbctx = NULL; (node = walk_kbnode(keyblock, &kbctx, 0));) {
-    if (node->pkt->pkttype != PKT_USER_ID) continue;
-    uid = node->pkt->pkt.user_id;
-
-    if (uid->flags.expired || uid->flags.revoked) continue;
-
-    xfree(mbox);
-    mbox = mailbox_from_userid(uid->name);
-    if (!mbox) continue;
-
-    domain = strchr(mbox, '@');
-    *domain++ = 0;
-
-    if (print_dane && hexdata) {
-      es_fprintf(fp, "$ORIGIN _openpgpkey.%s.\n; %s\n; ", domain, hexfpr);
-      print_utf8_buffer(fp, uid->name, uid->len);
-      es_putc('\n', fp);
-      std::unique_ptr<Botan::HashFunction> sha256 =
-          Botan::HashFunction::create_or_throw("SHA-256");
-      std::string hashbuf = Botan::hex_encode(sha256->process(mbox));
-      xfree(hash);
-      hash = xstrdup(hashbuf.c_str());
-      if (!hash) {
-        err = gpg_error_from_syserror();
-        goto leave;
-      }
-      ascii_strlwr(hash);
-      len = strlen(hexdata) / 2;
-      es_fprintf(fp, "%s TYPE61 \\# %u (\n", hash, len);
-      for (s = hexdata;;) {
-        es_fprintf(fp, "\t%.64s\n", s);
-        if (strlen(s) < 64) break;
-        s += 64;
-      }
-      es_fputs("\t)\n\n", fp);
-    }
-  }
-
-  /* Make sure it is a string and write it.  */
-  es_fputc(0, fp);
-  {
-    void *vp;
-
-    if (es_fclose_snatch(fp, &vp, NULL)) {
-      err = gpg_error_from_syserror();
-      goto leave;
-    }
-    fp = NULL;
-    iobuf_writestr(out, (const char *)(vp));
-    es_free(vp);
-  }
-  err = 0;
-
-leave:
-  xfree(hash);
-  xfree(mbox);
-  es_fclose(fp);
-  xfree(hexdata);
-  xfree(hexfpr);
-  return err;
 }
 
 /* Helper for do_export_stream which writes one keyblock to OUT.  */
@@ -1548,21 +1429,12 @@ static int do_export_stream(ctrl_t ctrl, iobuf_t out,
   KEYDB_SEARCH_DESC *desc = NULL;
   KEYDB_HANDLE kdbhd;
   struct export_stats_s dummystats;
-  iobuf_t out_help = NULL;
 
   if (!stats) stats = &dummystats;
   *any = 0;
   init_packet(&pkt);
   kdbhd = keydb_new();
   if (!kdbhd) return gpg_error_from_syserror();
-
-  /* For the DANE format open a helper iobuf and for DANE
-   * enforce some options.  */
-  if ((options & (EXPORT_DANE_FORMAT))) {
-    out_help = iobuf_temp();
-    if ((options & EXPORT_DANE_FORMAT))
-      options |= EXPORT_MINIMAL | EXPORT_CLEAN;
-  }
 
   if (users.empty()) {
     ndesc = 1;
@@ -1673,7 +1545,7 @@ static int do_export_stream(ctrl_t ctrl, iobuf_t out,
 
     /* And write it. */
     err = do_export_one_keyblock(ctrl, keyblock, keyid,
-                                 out_help ? out_help : out, secret, options,
+                                 out, secret, options,
                                  stats, any, desc, ndesc, descindex);
     if (err) break;
 
@@ -1681,29 +1553,10 @@ static int do_export_stream(ctrl_t ctrl, iobuf_t out,
       *keyblock_out = keyblock;
       break;
     }
-
-    if (out_help) {
-      /* We want to write DANE records.  OUT_HELP has the
-       * keyblock and we print a record for each uid to OUT. */
-      const void *data;
-      size_t datalen;
-
-      iobuf_flush_temp(out_help);
-      data = iobuf_get_temp_buffer(out_help);
-      datalen = iobuf_get_temp_length(out_help);
-
-      err = print_dane_records(out, keyblock, pk, data, datalen,
-                                      (options & EXPORT_DANE_FORMAT));
-      if (err) goto leave;
-
-      iobuf_close(out_help);
-      out_help = iobuf_temp();
-    }
   }
   if (err == GPG_ERR_NOT_FOUND) err = 0;
 
 leave:
-  iobuf_cancel(out_help);
   xfree(desc);
   keydb_release(kdbhd);
   if (err || !keyblock_out) release_kbnode(keyblock);

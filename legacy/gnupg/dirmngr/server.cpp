@@ -472,19 +472,16 @@ static gpg_error_t option_handler(assuan_context_t ctx, const char *key,
 
 static const char hlp_dns_cert[] =
     "DNS_CERT <subtype> <name>\n"
-    "DNS_CERT --dane <user_id>\n"
     "\n"
     "Return the CERT record for <name>.  <subtype> is one of\n"
     "  *     Return the first record of any supported subtype\n"
     "  PGP   Return the first record of subtype PGP (3)\n"
     "  IPGP  Return the first record of subtype IPGP (6)\n"
     "If the content of a certificate is available (PGP) it is returned\n"
-    "by data lines.  Fingerprints and URLs are returned via status lines.\n"
-    "In --dane mode the key is returned from RR type 61";
+    "by data lines.  Fingerprints and URLs are returned via status lines.\n";
 static gpg_error_t cmd_dns_cert(assuan_context_t ctx, char *line) {
   /* ctrl_t ctrl = assuan_get_pointer (ctx); */
   gpg_error_t err = 0;
-  int dane_mode;
   char *mbox = NULL;
   char *namebuf = NULL;
   char *encodedhash = NULL;
@@ -497,12 +494,9 @@ static gpg_error_t cmd_dns_cert(assuan_context_t ctx, char *line) {
   size_t fprlen;
   char *url = NULL;
 
-  dane_mode = has_option(line, "--dane");
   line = skip_options(line);
 
-  if (dane_mode)
-    ; /* No need to parse here - we do this later.  */
-  else {
+  {
     p = strchr(line, ' ');
     if (!p) {
       err = PARM_ERROR("missing arguments");
@@ -527,35 +521,7 @@ static gpg_error_t cmd_dns_cert(assuan_context_t ctx, char *line) {
     }
   }
 
-  if (dane_mode) {
-    char *domain;     /* Points to mbox.  */
-    char hashbuf[32]; /* For SHA-1 and SHA-256. */
-
-    /* We lowercase ascii characters but the DANE I-D does not allow
-       this.  FIXME: Check after the release of the RFC whether to
-       change this.  */
-    mbox = mailbox_from_userid(line);
-    if (!mbox || !(domain = strchr(mbox, '@'))) {
-      err = set_error(GPG_ERR_INV_USER_ID, "no mailbox in user id");
-      goto leave;
-    }
-    *domain++ = 0;
-
-    {
-      /* Note: The hash is truncated to 28 bytes and we lowercase
-         the result only for aesthetic reasons.  */
-      std::unique_ptr<Botan::HashFunction> sha256 =
-          Botan::HashFunction::create_or_throw("SHA-256");
-      Botan::secure_vector<uint8_t> hash = sha256->process(mbox);
-      hash.resize(28);
-      std::string encoded = Botan::hex_encode(hash, false);
-      memcpy(hashbuf, hash.data(), hash.size());
-      encoded = encoded + "._openpgpkey." + domain;
-      name = xstrdup(encoded.c_str());
-      certtype = DNS_CERTTYPE_RR61;
-    }
-  } else
-    name = line;
+  name = line;
 
   err = get_dns_cert(name, certtype, &key, &keylen, &fpr, &fprlen, &url);
   if (err) goto leave;
