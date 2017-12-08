@@ -48,7 +48,7 @@
 * libneopg is the "library for GPG" that never was
 * easy high-level interface
 * transparent in depth
-* all policy decisions replacable (trust interface, passphrase lookup, etc)
+* all policy decisions replaceable (trust interface, passphrase lookup, etc)
 * libgpgme-compatible legacy interface
 
 ---
