@@ -1617,54 +1617,6 @@ int keyserver_fetch(ctrl_t ctrl, const std::vector<std::string> &urilist) {
   return 0;
 }
 
-/* Import a key using the Web Key Directory protocol.  */
-gpg_error_t keyserver_import_wkd(ctrl_t ctrl, const char *name, int quick,
-                                 unsigned char **fpr, size_t *fpr_len) {
-  gpg_error_t err;
-  char *mbox;
-  estream_t key;
-
-  /* We want to work on the mbox.  That is what dirmngr will do anyway
-   * and we need the mbox for the import filter anyway.  */
-  mbox = mailbox_from_userid(name);
-  if (!mbox) {
-    err = gpg_error_from_syserror();
-    if (err == GPG_ERR_EINVAL) err = GPG_ERR_INV_USER_ID;
-    return err;
-  }
-
-  err = gpg_dirmngr_wkd_get(ctrl, mbox, quick, &key);
-  if (err)
-    ;
-  else if (key) {
-    int armor_status = opt.no_armor;
-    import_filter_t save_filt;
-
-    /* Keys returned via WKD are in binary format. */
-    opt.no_armor = 1;
-    save_filt = save_and_clear_import_filter();
-    if (!save_filt)
-      err = gpg_error_from_syserror();
-    else {
-      std::string filtstr("keep-uid=mbox = ");
-      filtstr += mbox;
-      err = parse_and_set_import_filter(filtstr.c_str());
-      if (!err)
-        err = import_keys_es_stream(ctrl, key, NULL, fpr, fpr_len,
-                                    IMPORT_NO_SECKEY, NULL, NULL);
-    }
-
-    restore_import_filter(save_filt);
-    opt.no_armor = armor_status;
-
-    es_fclose(key);
-    key = NULL;
-  }
-
-  xfree(mbox);
-  return err;
-}
-
 /* Import a key by name using LDAP */
 int keyserver_import_ldap(ctrl_t ctrl, const char *name, unsigned char **fpr,
                           size_t *fprlen) {

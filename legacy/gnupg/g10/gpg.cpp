@@ -190,7 +190,6 @@ enum cmd_and_opt_values {
   oWithICAOSpelling,
   oWithKeygrip,
   oWithSecret,
-  oWithWKDHash,
   oWithColons,
   oWithKeyData,
   oWithSigList,
@@ -617,7 +616,6 @@ const static ARGPARSE_OPTS opts[] = {
     ARGPARSE_s_n(oWithICAOSpelling, "with-icao-spelling", "@"),
     ARGPARSE_s_n(oWithKeygrip, "with-keygrip", "@"),
     ARGPARSE_s_n(oWithSecret, "with-secret", "@"),
-    ARGPARSE_s_n(oWithWKDHash, "with-wkd-hash", "@"),
     ARGPARSE_s_s(oDisableCipherAlgo, "disable-cipher-algo", "@"),
     ARGPARSE_s_s(oDisablePubkeyAlgo, "disable-pubkey-algo", "@"),
     ARGPARSE_s_n(oAllowFreeformUID, "allow-freeform-uid", "@"),
@@ -1850,10 +1848,6 @@ next_pass:
 
       case oWithSecret:
         opt.with_secret = true;
-        break;
-
-      case oWithWKDHash:
-        opt.with_wkd_hash = true;
         break;
 
       case oSecretKeyring:

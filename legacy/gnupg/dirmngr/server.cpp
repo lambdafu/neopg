@@ -470,126 +470,6 @@ static gpg_error_t option_handler(assuan_context_t ctx, const char *key,
   return err;
 }
 
-static const char hlp_wkd_get[] =
-    "WKD_GET [--submission-address|--policy-flags] <user_id>\n"
-    "\n"
-    "Return the key or other info for <user_id>\n"
-    "from the Web Key Directory.";
-static gpg_error_t cmd_wkd_get(assuan_context_t ctx, char *line) {
-  ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
-  gpg_error_t err = 0;
-  char *mbox = NULL;
-  char *domainbuf = NULL;
-  char *domain; /* Points to mbox or domainbuf.  */
-  char *uri = NULL;
-  char *encodedhash = NULL;
-  int opt_submission_addr;
-  int opt_policy_flags;
-  int no_log = 0;
-  char portstr[20] = {0};
-
-  opt_submission_addr = has_option(line, "--submission-address");
-  opt_policy_flags = has_option(line, "--policy-flags");
-  if (has_option(line, "--quick")) ctrl->timeout = opt.connect_quick_timeout;
-  line = skip_options(line);
-
-  mbox = mailbox_from_userid(line);
-  if (!mbox || !(domain = strchr(mbox, '@'))) {
-    err = set_error(GPG_ERR_INV_USER_ID, "no mailbox in user id");
-    goto leave;
-  }
-  *domain++ = 0;
-
-  /* Check for SRV records.  */
-  if (1) {
-    struct srventry *srvs;
-    unsigned int srvscount;
-    size_t domainlen, targetlen;
-    int i;
-
-    err = get_dns_srv(domain, "openpgpkey", NULL, &srvs, &srvscount);
-    if (err) goto leave;
-
-    /* Find the first target which also ends in DOMAIN or is equal
-     * to DOMAIN.  */
-    domainlen = strlen(domain);
-    for (i = 0; i < srvscount; i++) {
-      log_debug("srv: trying '%s:%hu'\n", srvs[i].target, srvs[i].port);
-      targetlen = strlen(srvs[i].target);
-      if ((targetlen > domainlen + 1 &&
-           srvs[i].target[targetlen - domainlen - 1] == '.' &&
-           !ascii_strcasecmp(srvs[i].target + targetlen - domainlen, domain)) ||
-          (targetlen == domainlen &&
-           !ascii_strcasecmp(srvs[i].target, domain))) {
-        /* found.  */
-        domainbuf = xtrystrdup(srvs[i].target);
-        if (!domainbuf) {
-          err = gpg_error_from_syserror();
-          xfree(srvs);
-          goto leave;
-        }
-        domain = domainbuf;
-        if (srvs[i].port)
-          snprintf(portstr, sizeof portstr, ":%hu", srvs[i].port);
-        break;
-      }
-    }
-    xfree(srvs);
-    log_debug("srv: got '%s%s'\n", domain, portstr);
-  }
-
-  {
-    std::unique_ptr<Botan::HashFunction> sha1 =
-        Botan::HashFunction::create_or_throw("SHA-1");
-    Botan::secure_vector<uint8_t> hash = sha1->process(mbox);
-    encodedhash = zb32_encode(hash.data(), 8 * 20);
-  }
-  if (!encodedhash) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
-
-  if (opt_submission_addr) {
-    uri = strconcat("https://", domain, portstr,
-                    "/.well-known/openpgpkey/submission-address", NULL);
-  } else if (opt_policy_flags) {
-    uri = strconcat("https://", domain, portstr,
-                    "/.well-known/openpgpkey/policy", NULL);
-  } else {
-    uri = strconcat("https://", domain, portstr, "/.well-known/openpgpkey/hu/",
-                    encodedhash, NULL);
-    no_log = 1;
-  }
-  if (!uri) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
-
-  /* Setup an output stream and perform the get.  */
-  {
-    estream_t outfp;
-
-    outfp = es_fopencookie(ctx, "w", data_line_cookie_functions);
-    if (!outfp)
-      err = set_error(GPG_ERR_ASS_GENERAL, "error setting up a data stream");
-    else {
-      if (no_log) ctrl->server_local->inhibit_data_logging = 1;
-      ctrl->server_local->inhibit_data_logging_now = 0;
-      ctrl->server_local->inhibit_data_logging_count = 0;
-      err = ks_action_fetch(ctrl, uri, outfp);
-      es_fclose(outfp);
-      ctrl->server_local->inhibit_data_logging = 0;
-    }
-  }
-
-leave:
-  xfree(uri);
-  xfree(encodedhash);
-  xfree(mbox);
-  xfree(domainbuf);
-  return leave_cmd(ctx, err);
-}
-
 static const char hlp_isvalid[] =
     "ISVALID [--only-ocsp] [--force-default-responder]"
     " <certificate_id>|<certificate_fpr>\n"
@@ -1666,8 +1546,7 @@ static int register_commands(assuan_context_t ctx) {
     const char *name;
     assuan_handler_t handler;
     const char *const help;
-  } table[] = {{"WKD_GET", cmd_wkd_get, hlp_wkd_get},
-               {"ISVALID", cmd_isvalid, hlp_isvalid},
+  } table[] = {{"ISVALID", cmd_isvalid, hlp_isvalid},
                {"CHECKCRL", cmd_checkcrl, hlp_checkcrl},
                {"CHECKOCSP", cmd_checkocsp, hlp_checkocsp},
                {"LOOKUP", cmd_lookup, hlp_lookup},

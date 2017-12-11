@@ -1282,15 +1282,6 @@ leave:
   return rc;
 }
 
-/* Return true if the AKL has the WKD method specified.  */
-static int akl_has_wkd_method(void) {
-  struct akl *akl;
-
-  for (akl = opt.auto_key_locate; akl; akl = akl->next)
-    if (akl->type == AKL_WKD) return 1;
-  return 0;
-}
-
 /* Return the ISSUER fingerprint string in human readbale format if
  * available.  Caller must release the string.  */
 static char *issuer_fpr_string(PKT_signature *sig) {
@@ -1493,9 +1484,7 @@ static int check_sig_and_print(CTX c, kbnode_t node) {
 
   /* If the above methods didn't work, our next try is to locate
    * the key via its fingerprint from a keyserver.  This requires
-   * that the signers fingerprint is encoded in the signature.  We
-   * favor this over the WKD method (to be tried next), because an
-   * arbitrary keyserver is less subject to web bug like monitoring.  */
+   * that the signers fingerprint is encoded in the signature.  */
   if (rc == GPG_ERR_NO_PUBKEY &&
       (opt.keyserver_options.options & KEYSERVER_AUTO_KEY_RETRIEVE) &&
       keyserver_any_configured(c->ctrl)) {
@@ -1513,24 +1502,6 @@ static int check_sig_and_print(CTX c, kbnode_t node) {
       glo_ctrl.in_auto_key_retrieve--;
       if (!res) rc = do_check_sig(c, node, NULL, &is_expkey, &is_revkey, &pk);
     }
-  }
-
-  /* If the above methods didn't work, our next try is to retrieve the
-   * key from the WKD. */
-  if (rc == GPG_ERR_NO_PUBKEY &&
-      (opt.keyserver_options.options & KEYSERVER_AUTO_KEY_RETRIEVE) &&
-      !opt.flags.disable_signer_uid && akl_has_wkd_method() &&
-      sig->signers_uid) {
-    int res;
-
-    free_public_key(pk);
-    pk = NULL;
-    glo_ctrl.in_auto_key_retrieve++;
-    res = keyserver_import_wkd(c->ctrl, sig->signers_uid, 1, NULL, NULL);
-    glo_ctrl.in_auto_key_retrieve--;
-    /* Fixme: If the fingerprint is embedded in the signature,
-     * compare it to the fingerprint of the returned key.  */
-    if (!res) rc = do_check_sig(c, node, NULL, &is_expkey, &is_revkey, &pk);
   }
 
   /* If the above methods did't work, our next try is to use a

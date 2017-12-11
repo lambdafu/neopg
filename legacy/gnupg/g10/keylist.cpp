@@ -798,27 +798,6 @@ static void list_keyblock_print(ctrl_t ctrl, kbnode_t keyblock, int secret,
       print_utf8_buffer(es_stdout, uid->name, uid->len);
       es_putc('\n', es_stdout);
 
-      if (opt.with_wkd_hash) {
-        char *mbox, *hash, *p;
-        char hashbuf[20];
-
-        mbox = mailbox_from_userid(uid->name);
-        if (mbox && (p = strchr(mbox, '@'))) {
-          *p++ = 0;
-
-          std::unique_ptr<Botan::HashFunction> sha1(
-              Botan::HashFunction::create_or_throw("SHA-1"));
-          sha1->update((const uint8_t *)mbox, strlen(mbox));
-          sha1->final((uint8_t *)hashbuf);
-
-          hash = zb32_encode(hashbuf, 8 * 20);
-          if (hash) {
-            es_fprintf(es_stdout, "   %*s%s@%s\n", indent, "", hash, p);
-            xfree(hash);
-          }
-        }
-        xfree(mbox);
-      }
     } else if (node->pkt->pkttype == PKT_PUBLIC_SUBKEY) {
       PKT_public_key *pk2 = node->pkt->pkt.public_key;
 

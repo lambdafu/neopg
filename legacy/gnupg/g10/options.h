@@ -52,15 +52,7 @@ enum {
   TM_AUTO
 };
 
-enum {
-  AKL_NODEFAULT,
-  AKL_LOCAL,
-  AKL_CERT,
-  AKL_WKD,
-  AKL_LDAP,
-  AKL_KEYSERVER,
-  AKL_SPEC
-};
+enum { AKL_NODEFAULT, AKL_LOCAL, AKL_CERT, AKL_LDAP, AKL_KEYSERVER, AKL_SPEC };
 
 struct akl {
   int type;
@@ -195,12 +187,11 @@ struct options {
   bool with_icao_spelling{false}; /* Print ICAO spelling with fingerprints.  */
   bool with_fingerprint{false};   /* Option --with-fingerprint active.  */
   bool with_subkey_fingerprint{
-      false};                /* Option --with-subkey-fingerprint active.  */
-  bool with_keygrip{false};  /* Option --with-keygrip active.  */
-  bool with_secret{false};   /* Option --with-secret active.  */
-  bool with_wkd_hash{false}; /* Option --with-wkd-hash.  */
-  int fingerprint{0};        /* list fingerprints */
-  bool list_sigs{false};     /* list signatures */
+      false};               /* Option --with-subkey-fingerprint active.  */
+  bool with_keygrip{false}; /* Option --with-keygrip active.  */
+  bool with_secret{false};  /* Option --with-secret active.  */
+  int fingerprint{0};       /* list fingerprints */
+  bool list_sigs{false};    /* list signatures */
   bool no_armor{false};
   bool list_packets{false}; /* Option --list-packets active.  */
   int def_cipher_algo{0};

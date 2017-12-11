@@ -114,7 +114,6 @@ enum {
   KEYORG_UNKNOWN = 0,
   KEYORG_KS = 1,      /* Public keyserver.    */
   KEYORG_KS_PREF = 2, /* Preferred keysrver.  */
-  KEYORG_WKD = 4,     /* Web Key Directory.   */
   KEYORG_URL = 5,     /* Trusted URL.         */
   KEYORG_FILE = 6,    /* Trusted file.        */
   KEYORG_SELF = 7,    /* We generated it.     */
