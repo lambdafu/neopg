@@ -117,12 +117,12 @@ void http_release_parsed_uri(parsed_uri_t uri);
 
 gpg_error_t http_raw_connect(http_t *r_hd, const char *server,
                              unsigned short port, unsigned int flags,
-                             const char *srvtag, unsigned int timeout);
+                             unsigned int timeout);
 
 gpg_error_t http_open(http_t *r_hd, http_req_t reqtype, const char *url,
                       const char *httphost, const char *auth,
                       unsigned int flags, const char *proxy,
-                      http_session_t session, const char *srvtag,
+                      http_session_t session,
                       const std::vector<std::string> &headers);
 
 void http_start_data(http_t hd);
@@ -134,7 +134,6 @@ void http_close(http_t hd, int keep_read_stream);
 gpg_error_t http_open_document(http_t *r_hd, const char *document,
                                const char *auth, unsigned int flags,
                                const char *proxy, http_session_t session,
-                               const char *srvtag,
                                const std::vector<std::string> &headers);
 
 estream_t http_get_read_ptr(http_t hd);

@@ -87,9 +87,6 @@ struct hostinfo_s {
   unsigned int iporname_valid : 1; /* The field IPORNAME below is valid */
                                    /* (but may be NULL) */
   unsigned int did_a_lookup : 1;   /* Have we done an A lookup yet?  */
-  unsigned int did_srv_lookup : 2; /* One bit per protocol indicating
-                                      whether we already did a SRV
-                                      lookup.  */
   time_t died_at; /* The time the host was marked dead.  If this is
                      0 the host has been manually marked dead.  */
   char *cname;    /* Canonical name of the host.  Only set if this
@@ -131,7 +128,6 @@ static int create_new_hostinfo(const char *name) {
   hi->onion = 0;
   hi->dead = 0;
   hi->did_a_lookup = 0;
-  hi->did_srv_lookup = 0;
   hi->iporname_valid = 0;
   hi->died_at = 0;
   hi->cname = NULL;
@@ -351,20 +347,18 @@ static void hostinfo_sort_pool(hostinfo_t hi) {
  * to choose one of the hosts.  For example we skip those hosts which
  * failed for some time and we stick to one host for a time
  * independent of DNS retry times.  If FORCE_RESELECT is true a new
- * host is always selected.  If SRVTAG is NULL no service record
- * lookup will be done, if it is set that service name is used.  The
- * selected host is stored as a malloced string at R_HOST; on error
- * NULL is stored.  If we know the port used by the selected host from
- * a service record, a string representation is written to R_PORTSTR,
- * otherwise it is left untouched.  If R_HTTPFLAGS is not NULL it will
- * receive flags which are to be passed to http_open.  If R_HTTPHOST
- * is not NULL a malloced name of the host is stored there; this might
- * be different from R_HOST in case it has been selected from a
- * pool.  */
-static gpg_error_t map_host(ctrl_t ctrl, const char *name, const char *srvtag,
-                            int force_reselect, enum ks_protocol protocol,
-                            char **r_host, char *r_portstr,
-                            unsigned int *r_httpflags, char **r_httphost) {
+ * host is always selected.  The selected host is stored as a malloced
+ * string at R_HOST; on error NULL is stored.  If we know the port
+ * used by the selected host from a service record, a string
+ * representation is written to R_PORTSTR, otherwise it is left
+ * untouched.  If R_HTTPFLAGS is not NULL it will receive flags which
+ * are to be passed to http_open.  If R_HTTPHOST is not NULL a
+ * malloced name of the host is stored there; this might be different
+ * from R_HOST in case it has been selected from a pool.  */
+static gpg_error_t map_host(ctrl_t ctrl, const char *name, int force_reselect,
+                            enum ks_protocol protocol, char **r_host,
+                            char *r_portstr, unsigned int *r_httpflags,
+                            char **r_httphost) {
   gpg_error_t err = 0;
   hostinfo_t hi;
   int idx;
@@ -394,36 +388,6 @@ static gpg_error_t map_host(ctrl_t ctrl, const char *name, const char *srvtag,
     hi = hosttable[idx];
 
   is_pool = hi->pool != NULL;
-
-  if (srvtag && !is_ip_address(name) && !hi->onion &&
-      !(hi->did_srv_lookup & 1 << protocol)) {
-    struct srventry *srvs;
-    unsigned int srvscount;
-
-    /* Check for SRV records.  */
-    err = get_dns_srv(name, srvtag, NULL, &srvs, &srvscount);
-    if (err) {
-      return err;
-    }
-
-    if (srvscount > 0) {
-      int i;
-      if (!is_pool) is_pool = srvscount > 1;
-
-      for (i = 0; i < srvscount; i++) {
-        err = resolve_dns_name(srvs[i].target, 0, AF_UNSPEC, SOCK_STREAM, &ai,
-                               &cname);
-        if (err) continue;
-        dirmngr_tick(ctrl);
-        add_host(name, is_pool, ai, protocol, srvs[i].port);
-        new_hosts = 1;
-      }
-
-      xfree(srvs);
-    }
-
-    hi->did_srv_lookup |= 1 << protocol;
-  }
 
   if (!hi->did_a_lookup && !hi->onion) {
     /* Find all A records for this entry and put them into the pool
@@ -773,18 +737,16 @@ gpg_error_t ks_hkp_help(ctrl_t ctrl, parsed_uri_t uri) {
 }
 
 /* Build the remote part of the URL from SCHEME, HOST and an optional
- * PORT.  If NO_SRV is set no SRV record lookup will be done.  Returns
- * an allocated string at R_HOSTPORT or NULL on failure.  If
- * R_HTTPHOST is not NULL it receives a malloced string with the
- * hostname; this may be different from HOST if HOST is selected from
- * a pool.  */
+ * PORT.  Returns an allocated string at R_HOSTPORT or NULL on
+ * failure.  If R_HTTPHOST is not NULL it receives a malloced string
+ * with the hostname; this may be different from HOST if HOST is
+ * selected from a pool.  */
 static gpg_error_t make_host_part(ctrl_t ctrl, const char *scheme,
                                   const char *host, unsigned short port,
-                                  int force_reselect, int no_srv,
-                                  char **r_hostport, unsigned int *r_httpflags,
+                                  int force_reselect, char **r_hostport,
+                                  unsigned int *r_httpflags,
                                   char **r_httphost) {
   gpg_error_t err;
-  const char *srvtag;
   char portstr[10];
   char *hostname;
   enum ks_protocol protocol;
@@ -793,24 +755,22 @@ static gpg_error_t make_host_part(ctrl_t ctrl, const char *scheme,
 
   if (!strcmp(scheme, "hkps") || !strcmp(scheme, "https")) {
     scheme = "https";
-    srvtag = no_srv ? NULL : "pgpkey-https";
     protocol = KS_PROTOCOL_HKPS;
   } else /* HKP or HTTP.  */
   {
     scheme = "http";
-    srvtag = no_srv ? NULL : "pgpkey-http";
     protocol = KS_PROTOCOL_HKP;
   }
 
   portstr[0] = 0;
-  err = map_host(ctrl, host, srvtag, force_reselect, protocol, &hostname,
-                 portstr, r_httpflags, r_httphost);
+  err = map_host(ctrl, host, force_reselect, protocol, &hostname, portstr,
+                 r_httpflags, r_httphost);
   if (err) return err;
 
-  /* If map_host did not return a port (from a SRV record) but a port
-   * has been specified (implicitly or explicitly) then use that port.
-   * In the case that a port was not specified (which is probably a
-   * bug in https.c) we will set up defaults.  */
+  /* If map_host did not return a port but a port has been specified
+   * (implicitly or explicitly) then use that port.  In the case that
+   * a port was not specified (which is probably a bug in https.c) we
+   * will set up defaults.  */
   if (*portstr)
     ;
   else if (!*portstr && port)
@@ -845,8 +805,8 @@ gpg_error_t ks_hkp_resolve(ctrl_t ctrl, parsed_uri_t uri) {
   /* NB: With an explicitly given port we do not want to consult a
    * service record because that might be in conflict with the port
    * from such a service record.  */
-  err = make_host_part(ctrl, uri->scheme, uri->host, uri->port, 1,
-                       uri->explicit_port, &hostport, NULL, NULL);
+  err = make_host_part(ctrl, uri->scheme, uri->host, uri->port, 1, &hostport,
+                       NULL, NULL);
   if (err) {
     err = ks_printf_help(ctrl, "%s://%s:%hu: resolve failed: %s", uri->scheme,
                          uri->host, uri->port, gpg_strerror(err));
@@ -929,8 +889,7 @@ once_more:
       (httpflags | (opt.honor_http_proxy ? HTTP_FLAG_TRY_PROXY : 0) |
        (opt.disable_ipv4 ? HTTP_FLAG_IGNORE_IPv4 : 0) |
        (opt.disable_ipv6 ? HTTP_FLAG_IGNORE_IPv6 : 0)),
-      ctrl->http_proxy, session, NULL,
-      /*FIXME curl->srvtag*/ headers);
+      ctrl->http_proxy, session, headers);
   if (!err) {
     fp = http_get_write_ptr(http);
     /* Avoid caches to get the most recent copy of the key.  We set
@@ -1141,7 +1100,7 @@ again : {
   xfree(httphost);
   httphost = NULL;
   err = make_host_part(ctrl, uri->scheme, uri->host, uri->port, reselect,
-                       uri->explicit_port, &hostport, &httpflags, &httphost);
+                       &hostport, &httpflags, &httphost);
   if (err) goto leave;
 
   searchkey = http_escape_string(pattern, EXTRA_ESCAPE_CHARS);
@@ -1270,7 +1229,7 @@ again:
   xfree(httphost);
   httphost = NULL;
   err = make_host_part(ctrl, uri->scheme, uri->host, uri->port, reselect,
-                       uri->explicit_port, &hostport, &httpflags, &httphost);
+                       &hostport, &httpflags, &httphost);
   if (err) goto leave;
 
   xfree(request);
@@ -1367,7 +1326,7 @@ again:
   xfree(httphost);
   httphost = NULL;
   err = make_host_part(ctrl, uri->scheme, uri->host, uri->port, reselect,
-                       uri->explicit_port, &hostport, &httpflags, &httphost);
+                       &hostport, &httpflags, &httphost);
   if (err) goto leave;
 
   xfree(request);

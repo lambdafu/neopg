@@ -80,8 +80,7 @@ once_more:
                   ((opt.honor_http_proxy ? HTTP_FLAG_TRY_PROXY : 0) |
                    (opt.disable_ipv4 ? HTTP_FLAG_IGNORE_IPv4 : 0) |
                    (opt.disable_ipv6 ? HTTP_FLAG_IGNORE_IPv6 : 0)),
-                  ctrl->http_proxy, session, NULL,
-                  /*FIXME curl->srvtag*/ headers);
+                  ctrl->http_proxy, session, headers);
   if (!err) {
     fp = http_get_write_ptr(http);
     /* Avoid caches to get the most recent copy of the key.  We set

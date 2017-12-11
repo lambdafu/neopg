@@ -121,14 +121,14 @@ static int insert_escapes(char *buffer, const char *string,
 static uri_tuple_t parse_tuple(char *string);
 static gpg_error_t send_request(http_t hd, const char *httphost,
                                 const char *auth, const char *proxy,
-                                const char *srvtag, unsigned int timeout,
+                                unsigned int timeout,
                                 const std::vector<std::string> &headers);
 static char *build_rel_path(parsed_uri_t uri);
 static gpg_error_t parse_response(http_t hd);
 
 static gpg_error_t connect_server(const char *server, unsigned short port,
-                                  unsigned int flags, const char *srvtag,
-                                  unsigned int timeout, assuan_fd_t *r_sock);
+                                  unsigned int flags, unsigned int timeout,
+                                  assuan_fd_t *r_sock);
 static gpgrt_ssize_t read_server(assuan_fd_t sock, void *buffer, size_t size);
 static gpg_error_t write_server(assuan_fd_t sock, const char *data,
                                 size_t length);
@@ -602,7 +602,7 @@ void http_session_set_timeout(http_session_t sess, unsigned int timeout) {
 gpg_error_t http_open(http_t *r_hd, http_req_t reqtype, const char *url,
                       const char *httphost, const char *auth,
                       unsigned int flags, const char *proxy,
-                      http_session_t session, const char *srvtag,
+                      http_session_t session,
                       const std::vector<std::string> &headers) {
   gpg_error_t err;
   http_t hd;
@@ -622,7 +622,7 @@ gpg_error_t http_open(http_t *r_hd, http_req_t reqtype, const char *url,
 
   err = parse_uri(&hd->uri, url, 0, !!(flags & HTTP_FLAG_FORCE_TLS));
   if (!err)
-    err = send_request(hd, httphost, auth, proxy, srvtag,
+    err = send_request(hd, httphost, auth, proxy,
                        hd->session ? hd->session->connect_timeout : 0, headers);
 
   if (err) {
@@ -641,7 +641,7 @@ gpg_error_t http_open(http_t *r_hd, http_req_t reqtype, const char *url,
    service tags and an estream interface.  TIMEOUT is in milliseconds. */
 gpg_error_t http_raw_connect(http_t *r_hd, const char *server,
                              unsigned short port, unsigned int flags,
-                             const char *srvtag, unsigned int timeout) {
+                             unsigned int timeout) {
   gpg_error_t err = 0;
   http_t hd;
   cookie_t cookie;
@@ -659,7 +659,7 @@ gpg_error_t http_raw_connect(http_t *r_hd, const char *server,
   {
     assuan_fd_t sock;
 
-    err = connect_server(server, port, hd->flags, srvtag, timeout, &sock);
+    err = connect_server(server, port, hd->flags, timeout, &sock);
     if (err) {
       xfree(hd);
       return err;
@@ -785,12 +785,11 @@ gpg_error_t http_wait_response(http_t hd) {
 gpg_error_t http_open_document(http_t *r_hd, const char *document,
                                const char *auth, unsigned int flags,
                                const char *proxy, http_session_t session,
-                               const char *srvtag,
                                const std::vector<std::string> &headers) {
   gpg_error_t err;
 
   err = http_open(r_hd, HTTP_REQ_GET, document, NULL, auth, flags, proxy,
-                  session, srvtag, headers);
+                  session, headers);
   if (err) return err;
 
   err = http_wait_response(*r_hd);
@@ -905,7 +904,6 @@ static gpg_error_t do_parse_uri(parsed_uri_t uri, int only_local_part,
   uri->opaque = 0;
   uri->v6lit = 0;
   uri->onion = 0;
-  uri->explicit_port = 0;
 
   /* A quick validity check. */
   if (strspn(p, VALID_URI_CHARS) != n)
@@ -962,7 +960,6 @@ static gpg_error_t do_parse_uri(parsed_uri_t uri, int only_local_part,
       if ((p3 = strchr(p, ':'))) {
         *p3++ = '\0';
         uri->port = atoi(p3);
-        uri->explicit_port = 1;
       }
 
       if ((n = remove_escapes(uri->host)) < 0) return GPG_ERR_BAD_URI;
@@ -1183,7 +1180,7 @@ static int is_hostname_port(const char *string) {
  */
 static gpg_error_t send_request(http_t hd, const char *httphost,
                                 const char *auth, const char *proxy,
-                                const char *srvtag, unsigned int timeout,
+                                unsigned int timeout,
                                 const std::vector<std::string> &headers) {
   gpg_error_t err;
   const char *server;
@@ -1265,11 +1262,10 @@ static gpg_error_t send_request(http_t hd, const char *httphost,
     }
 
     err = connect_server(*uri->host ? uri->host : "localhost",
-                         uri->port ? uri->port : 80, hd->flags, srvtag, timeout,
-                         &sock);
+                         uri->port ? uri->port : 80, hd->flags, timeout, &sock);
     http_release_parsed_uri(uri);
   } else {
-    err = connect_server(server, port, hd->flags, srvtag, timeout, &sock);
+    err = connect_server(server, port, hd->flags, timeout, &sock);
   }
 
   if (err) {
@@ -1921,16 +1917,14 @@ static gpg_error_t connect_with_timeout(assuan_fd_t sock, struct sockaddr *addr,
  * function tries to connect to all known addresses and the timeout is
  * for each one. */
 static gpg_error_t connect_server(const char *server, unsigned short port,
-                                  unsigned int flags, const char *srvtag,
-                                  unsigned int timeout, assuan_fd_t *r_sock) {
+                                  unsigned int flags, unsigned int timeout,
+                                  assuan_fd_t *r_sock) {
   gpg_error_t err;
   assuan_fd_t sock = ASSUAN_INVALID_FD;
-  unsigned int srvcount = 0;
   int hostfound = 0;
   int anyhostaddr = 0;
-  int srv, connected;
+  int connected;
   gpg_error_t last_err = 0;
-  struct srventry *serverlist = NULL;
 
   *r_sock = ASSUAN_INVALID_FD;
 
@@ -1961,73 +1955,46 @@ static gpg_error_t connect_server(const char *server, unsigned short port,
 #endif /*!HASSUAN_SOCK_TOR*/
   }
 
-  /* Do the SRV thing */
-  if (srvtag) {
-    err = get_dns_srv(server, srvtag, NULL, &serverlist, &srvcount);
-    if (err)
-      log_info("getting '%s' SRV for '%s' failed: %s\n", srvtag, server,
-               gpg_strerror(err));
-    /* Note that on error SRVCOUNT is zero.  */
-    err = 0;
-  }
-
-  if (!serverlist) {
-    /* Either we're not using SRV, or the SRV lookup failed.  Make
-       up a fake SRV record. */
-    serverlist = (srventry *)xtrycalloc(1, sizeof *serverlist);
-    if (!serverlist) return gpg_error_from_syserror();
-
-    serverlist->port = port;
-    strncpy(serverlist->target, server, DIMof(struct srventry, target));
-    serverlist->target[DIMof(struct srventry, target) - 1] = '\0';
-    srvcount = 1;
-  }
-
   connected = 0;
-  for (srv = 0; srv < srvcount && !connected; srv++) {
+  {
     dns_addrinfo_t aibuf, ai;
 
     if (opt_debug)
-      log_debug("http.c:connect_server: trying name='%s' port=%hu\n",
-                serverlist[srv].target, port);
-    err = resolve_dns_name(serverlist[srv].target, port, 0, SOCK_STREAM, &aibuf,
-                           NULL);
+      log_debug("http.c:connect_server: trying name='%s' port=%hu\n", server,
+                port);
+    err = resolve_dns_name(server, port, 0, SOCK_STREAM, &aibuf, NULL);
     if (err) {
-      log_info("resolving '%s' failed: %s\n", serverlist[srv].target,
-               gpg_strerror(err));
+      log_info("resolving '%s' failed: %s\n", server, gpg_strerror(err));
       last_err = err;
-      continue; /* Not found - try next one. */
-    }
-    hostfound = 1;
+    } else {
+      hostfound = 1;
 
-    for (ai = aibuf; ai && !connected; ai = ai->next) {
-      if (ai->family == AF_INET && (flags & HTTP_FLAG_IGNORE_IPv4)) continue;
-      if (ai->family == AF_INET6 && (flags & HTTP_FLAG_IGNORE_IPv6)) continue;
+      for (ai = aibuf; ai && !connected; ai = ai->next) {
+        if (ai->family == AF_INET && (flags & HTTP_FLAG_IGNORE_IPv4)) continue;
+        if (ai->family == AF_INET6 && (flags & HTTP_FLAG_IGNORE_IPv6)) continue;
 
-      if (sock != ASSUAN_INVALID_FD) assuan_sock_close(sock);
-      sock = assuan_sock_new(ai->addr->ss_family, ai->socktype, ai->protocol);
-      if (sock == ASSUAN_INVALID_FD) {
-        err = gpg_error_from_syserror();
-        log_error("error creating socket: %s\n", gpg_strerror(err));
-        free_dns_addrinfo(aibuf);
-        xfree(serverlist);
-        return err;
+        if (sock != ASSUAN_INVALID_FD) assuan_sock_close(sock);
+        sock = assuan_sock_new(ai->addr->ss_family, ai->socktype, ai->protocol);
+        if (sock == ASSUAN_INVALID_FD) {
+          err = gpg_error_from_syserror();
+          log_error("error creating socket: %s\n", gpg_strerror(err));
+          free_dns_addrinfo(aibuf);
+          return err;
+        }
+
+        anyhostaddr = 1;
+        err = connect_with_timeout(sock, (struct sockaddr *)ai->addr,
+                                   ai->addrlen, timeout);
+        if (err) {
+          last_err = err;
+        } else {
+          connected = 1;
+          notify_netactivity();
+        }
       }
-
-      anyhostaddr = 1;
-      err = connect_with_timeout(sock, (struct sockaddr *)ai->addr, ai->addrlen,
-                                 timeout);
-      if (err) {
-        last_err = err;
-      } else {
-        connected = 1;
-        notify_netactivity();
-      }
+      free_dns_addrinfo(aibuf);
     }
-    free_dns_addrinfo(aibuf);
   }
-
-  xfree(serverlist);
 
   if (!connected) {
     if (!hostfound)

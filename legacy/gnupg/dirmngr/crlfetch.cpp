@@ -165,7 +165,7 @@ once_more:
                            (DBG_LOOKUP ? HTTP_FLAG_LOG_RESP : 0) |
                            (opt.disable_ipv4 ? HTTP_FLAG_IGNORE_IPv4 : 0) |
                            (opt.disable_ipv6 ? HTTP_FLAG_IGNORE_IPv6 : 0)),
-          ctrl->http_proxy, NULL, NULL, headers);
+          ctrl->http_proxy, NULL, headers);
 
     switch (err ? 99999 : http_get_status_code(hd)) {
       case 200: {

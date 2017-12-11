@@ -59,14 +59,6 @@ struct dns_addrinfo_s {
   struct sockaddr_storage addr[1];
 };
 
-struct srventry {
-  unsigned short priority;
-  unsigned short weight;
-  unsigned short port;
-  int run_count;
-  char target[1025];
-};
-
 /* Set verbosity and debug mode for this module. */
 void set_dns_verbose(int verbose, int debug);
 
@@ -118,10 +110,5 @@ int is_onion_address(const char *name);
 
 /* Get the canonical name for NAME.  */
 gpg_error_t get_dns_cname(const char *name, char **r_cname);
-
-/* Return an array of SRV records.  */
-gpg_error_t get_dns_srv(const char *name, const char *service,
-                        const char *proto, struct srventry **list,
-                        unsigned int *r_count);
 
 #endif /*GNUPG_DIRMNGR_DNS_STUFF_H*/
