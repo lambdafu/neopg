@@ -50,7 +50,6 @@
 #include "certcache.h"
 #include "crlcache.h"
 #include "crlfetch.h"
-#include "dns-stuff.h"
 #include "misc.h"
 
 #ifndef ENAMETOOLONG
@@ -109,9 +108,6 @@ enum cmd_and_opt_values {
   oUseTor,
   oNoUseTor,
   oKeyServer,
-  oStandardResolver,
-  oRecursiveResolver,
-  oResolverTimeout,
   oConnectTimeout,
   oConnectQuickTimeout,
   aTest
@@ -184,9 +180,6 @@ static ARGPARSE_OPTS opts[] = {
     ARGPARSE_s_s(oHTTPWrapperProgram, "http-wrapper-program", "@"),
     ARGPARSE_s_n(oHonorHTTPProxy, "honor-http-proxy", "@"),
     ARGPARSE_s_s(oIgnoreCertExtension, "ignore-cert-extension", "@"),
-    ARGPARSE_s_n(oStandardResolver, "standard-resolver", "@"),
-    ARGPARSE_s_n(oRecursiveResolver, "recursive-resolver", "@"),
-    ARGPARSE_s_i(oResolverTimeout, "resolver-timeout", "@"),
     ARGPARSE_s_i(oConnectTimeout, "connect-timeout", "@"),
     ARGPARSE_s_i(oConnectQuickTimeout, "connect-quick-timeout", "@"),
 
@@ -364,8 +357,6 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
       xfree(opt.ocsp_signer);
       opt.ocsp_signer = tmp;
     }
-    enable_standard_resolver(0);
-    set_dns_timeout(0);
     opt.connect_timeout = 0;
     opt.connect_quick_timeout = 0;
     return 1;
@@ -470,19 +461,8 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
       opt.ignored_cert_extensions.emplace((std::string)pargs->r.ret_str);
       break;
 
-    case oStandardResolver:
-      enable_standard_resolver(1);
-      break;
-    case oRecursiveResolver:
-      enable_recursive_resolver(1);
-      break;
-
     case oKeyServer:
       if (*pargs->r.ret_str) opt.keyserver.emplace_back(pargs->r.ret_str);
-      break;
-
-    case oResolverTimeout:
-      set_dns_timeout(pargs->r.ret_int);
       break;
 
     case oConnectTimeout:
@@ -496,10 +476,6 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
     default:
       return 0; /* Not handled. */
   }
-
-  set_dns_verbose(opt.verbose, !!DBG_DNS);
-  set_dns_disable_ipv4(opt.disable_ipv4);
-  set_dns_disable_ipv6(opt.disable_ipv6);
 
   return 1; /* Handled. */
 }
@@ -822,7 +798,6 @@ next_pass:
 static void cleanup(void) {
   crl_cache_deinit();
   cert_cache_deinit(1);
-  reload_dns_stuff(1);
 }
 
 void dirmngr_exit(int rc) {

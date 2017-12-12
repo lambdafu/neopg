@@ -43,7 +43,6 @@
 #include "certcache.h"
 #include "crlcache.h"
 #include "crlfetch.h"
-#include "dns-stuff.h"
 #include "ks-action.h"
 #include "misc.h"
 #include "ocsp.h"
@@ -1470,8 +1469,7 @@ static const char hlp_getinfo[] =
     "\n"
     "version     - Return the version of the program.\n"
     "pid         - Return the process id of the server.\n"
-    "tor         - Return OK if running in Tor mode\n"
-    "dnsinfo     - Return info about the DNS resolver\n";
+    "tor         - Return OK if running in Tor mode\n";
 static gpg_error_t cmd_getinfo(assuan_context_t ctx, char *line) {
   ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
   gpg_error_t err;
@@ -1484,20 +1482,6 @@ static gpg_error_t cmd_getinfo(assuan_context_t ctx, char *line) {
 
     snprintf(numbuf, sizeof numbuf, "%lu", (unsigned long)getpid());
     err = assuan_send_data(ctx, numbuf, strlen(numbuf));
-  } else if (!strcmp(line, "dnsinfo")) {
-    if (standard_resolver_p())
-      assuan_set_okay_line(ctx,
-                           "- Forced use of System resolver (w/o Tor support)");
-    else {
-#ifdef USE_LIBDNS
-      assuan_set_okay_line(
-          ctx, (recursive_resolver_p() ? "- Libdns recursive resolver"
-                                       : "- Libdns stub resolver"));
-#else
-      assuan_set_okay_line(ctx, "- System resolver (w/o Tor support)");
-#endif
-    }
-    err = 0;
   } else
     err = set_error(GPG_ERR_ASS_PARAMETER, "unknown value for WHAT");
 
