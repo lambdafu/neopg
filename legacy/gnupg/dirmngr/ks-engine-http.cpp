@@ -24,12 +24,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <neopg/proto/http.h>
+
 #include "dirmngr.h"
 #include "ks-engine.h"
 #include "misc.h"
-
-/* How many redirections do we allow.  */
-#define MAX_REDIRECTS 2
 
 /* Print a help output for the schemata supported by this module. */
 gpg_error_t ks_http_help(ctrl_t ctrl, parsed_uri_t uri) {
@@ -54,110 +53,41 @@ gpg_error_t ks_http_help(ctrl_t ctrl, parsed_uri_t uri) {
 
 /* Get the key from URL which is expected to specify a http style
    scheme.  On success R_FP has an open stream to read the data.  */
-gpg_error_t ks_http_fetch(ctrl_t ctrl, const char *url, estream_t *r_fp) {
-  gpg_error_t err;
-  http_session_t session = NULL;
-  http_t http = NULL;
-  int redirects_left = MAX_REDIRECTS;
-  estream_t fp = NULL;
-  char *request_buffer = NULL;
-  std::vector<std::string> headers;
+gpg_error_t ks_http_fetch(ctrl_t ctrl, const char *url, std::string &response) {
+  if (!url) return GPG_ERR_INV_ARG;
 
-once_more:
-  /* Note that we only use the system provided certificates with the
-   * fetch command.  */
-  err = http_session_new(
-      &session, NULL,
-      ((ctrl->http_no_crl ? HTTP_FLAG_NO_CRL : 0) | HTTP_FLAG_TRUST_SYS));
-  if (err) goto leave;
-  http_session_set_log_cb(session, cert_log_cb);
-  http_session_set_timeout(session, ctrl->timeout);
-
-  *r_fp = NULL;
-  err = http_open(&http, HTTP_REQ_GET, url,
-                  /* httphost */ NULL,
-                  /* fixme: AUTH */ NULL,
-                  ((opt.honor_http_proxy ? HTTP_FLAG_TRY_PROXY : 0) |
-                   (opt.disable_ipv4 ? HTTP_FLAG_IGNORE_IPv4 : 0) |
-                   (opt.disable_ipv6 ? HTTP_FLAG_IGNORE_IPv6 : 0)),
-                  ctrl->http_proxy, session, headers);
-  if (!err) {
-    fp = http_get_write_ptr(http);
-    /* Avoid caches to get the most recent copy of the key.  We set
-       both the Pragma and Cache-Control versions of the header, so
-       we're good with both HTTP 1.0 and 1.1.  */
-    es_fputs(
-        "Pragma: no-cache\r\n"
-        "Cache-Control: no-cache\r\n",
-        fp);
-    http_start_data(http);
-    if (es_ferror(fp)) err = gpg_error_from_syserror();
+  if (opt.disable_http) {
+    log_error(_("CRL access not possible due to disabled %s\n"), "HTTP");
+    return GPG_ERR_NOT_SUPPORTED;
   }
-  if (err) {
-    /* Fixme: After a redirection we show the old host name.  */
-    log_error(_("error connecting to '%s': %s\n"), url, gpg_strerror(err));
-    goto leave;
+  /* libcurl doesn't support disabling all DNS lookups.  */
+  if (opt.disable_ipv4 && opt.disable_ipv6) {
+    log_error(_("CRL access not possible due to disabled %s\n"),
+              "ipv4 and ipv6");
+    return GPG_ERR_NOT_SUPPORTED;
   }
 
-  /* Wait for the response.  */
-  dirmngr_tick(ctrl);
-  err = http_wait_response(http);
-  if (err) {
-    log_error(_("error reading HTTP response for '%s': %s\n"), url,
-              gpg_strerror(err));
-    goto leave;
+  /* Note that we only use the system provided certificates.  */
+  /* ctrl->http_no_crl support?  */
+  NeoPG::Proto::Http request;
+  request.set_url(url).forbid_reuse().set_timeout(ctrl->timeout).no_cache();
+
+  if (opt.http_proxy)
+    request.set_proxy(opt.http_proxy);
+  else
+    request.default_proxy(opt.honor_http_proxy);
+
+  if (opt.disable_ipv6)
+    request.set_ipresolve(NeoPG::Proto::Http::Resolve::IPv4);
+  else if (opt.disable_ipv4)
+    request.set_ipresolve(NeoPG::Proto::Http::Resolve::IPv6);
+
+  try {
+    response = request.fetch();
+  } catch (const std::runtime_error &e) {
+    log_error(_("error retrieving '%s': %s\n"), url, e.what());
+    return GPG_ERR_NO_DATA;
   }
 
-  switch (http_get_status_code(http)) {
-    case 200:
-      err = 0;
-      break; /* Success.  */
-
-    case 301:
-    case 302:
-    case 307: {
-      const char *s = http_get_header(http, "Location");
-
-      log_info(_("URL '%s' redirected to '%s' (%u)\n"), url, s ? s : "[none]",
-               http_get_status_code(http));
-      if (s && *s && redirects_left--) {
-        xfree(request_buffer);
-        request_buffer = xtrystrdup(s);
-        if (request_buffer) {
-          url = request_buffer;
-          http_close(http, 0);
-          http = NULL;
-          http_session_release(session);
-          goto once_more;
-        }
-        err = gpg_error_from_syserror();
-      } else
-        err = GPG_ERR_NO_DATA;
-      log_error(_("too many redirections\n"));
-    }
-      goto leave;
-
-    default:
-      log_error(_("error accessing '%s': http status %u\n"), url,
-                http_get_status_code(http));
-      err = GPG_ERR_NO_DATA;
-      goto leave;
-  }
-
-  fp = http_get_read_ptr(http);
-  if (!fp) {
-    err = GPG_ERR_BUG;
-    goto leave;
-  }
-
-  /* Return the read stream and close the HTTP context.  */
-  *r_fp = fp;
-  http_close(http, 1);
-  http = NULL;
-
-leave:
-  http_close(http, 0);
-  http_session_release(session);
-  xfree(request_buffer);
-  return err;
+  return 0;
 }

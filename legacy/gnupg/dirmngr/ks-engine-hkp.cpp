@@ -20,6 +20,8 @@
 
 #include <config.h>
 
+#include <boost/optional.hpp>
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,6 +36,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #endif /*!HAVE_W32_SYSTEM*/
+
+#include <neopg/proto/http.h>
 
 #include "../common/userids.h"
 #include "dirmngr.h"
@@ -853,141 +857,77 @@ void ks_hkp_reload(void) {
   if (count) log_info("number of resurrected hosts: %d", count);
 }
 
-/* Send an HTTP request.  On success returns an estream object at
-   R_FP.  HOSTPORTSTR is only used for diagnostics.  If HTTPHOST is
-   not NULL it will be used as HTTP "Host" header.  If POST_CB is not
-   NULL a post request is used and that callback is called to allow
-   writing the post data.  If R_HTTP_STATUS is not NULL, the http
-   status code will be stored there.  */
-static gpg_error_t send_request(ctrl_t ctrl, const char *request,
+/* Send an HTTP request.  On success returns response in RESPONSE.
+   HOSTPORTSTR is only used for diagnostics.  If HTTPHOST is not NULL
+   it will be used as HTTP "Host" header.  If POST_CB is not NULL a
+   post request is used and that callback is called to allow writing
+   the post data.  If R_HTTP_STATUS is not NULL, the http status code
+   will be stored there.  */
+static gpg_error_t send_request(ctrl_t ctrl, const char *url,
                                 const char *hostportstr, const char *httphost,
                                 unsigned int httpflags,
-                                gpg_error_t (*post_cb)(void *, http_t),
-                                void *post_cb_value, estream_t *r_fp,
+                                boost::optional<std::string> post_data,
+                                std::string &response,
                                 unsigned int *r_http_status) {
-  gpg_error_t err;
-  http_session_t session = NULL;
-  http_t http = NULL;
-  int redirects_left = MAX_REDIRECTS;
-  estream_t fp = NULL;
-  char *request_buffer = NULL;
-  std::vector<std::string> headers;
+  if (!url) return GPG_ERR_INV_ARG;
 
-  *r_fp = NULL;
-
-  err = http_session_new(
-      &session, httphost,
-      ((ctrl->http_no_crl ? HTTP_FLAG_NO_CRL : 0) | HTTP_FLAG_TRUST_DEF));
-  if (err) goto leave;
-  http_session_set_log_cb(session, cert_log_cb);
-  http_session_set_timeout(session, ctrl->timeout);
-
-once_more:
-  err = http_open(
-      &http, post_cb ? HTTP_REQ_POST : HTTP_REQ_GET, request, httphost,
-      /* fixme: AUTH */ NULL,
-      (httpflags | (opt.honor_http_proxy ? HTTP_FLAG_TRY_PROXY : 0) |
-       (opt.disable_ipv4 ? HTTP_FLAG_IGNORE_IPv4 : 0) |
-       (opt.disable_ipv6 ? HTTP_FLAG_IGNORE_IPv6 : 0)),
-      ctrl->http_proxy, session, headers);
-  if (!err) {
-    fp = http_get_write_ptr(http);
-    /* Avoid caches to get the most recent copy of the key.  We set
-       both the Pragma and Cache-Control versions of the header, so
-       we're good with both HTTP 1.0 and 1.1.  */
-    es_fputs(
-        "Pragma: no-cache\r\n"
-        "Cache-Control: no-cache\r\n",
-        fp);
-    if (post_cb) err = post_cb(post_cb_value, http);
-    if (!err) {
-      http_start_data(http);
-      if (es_ferror(fp)) err = gpg_error_from_syserror();
-    }
+  if (opt.disable_http) {
+    log_error(_("CRL access not possible due to disabled %s\n"), "HTTP");
+    return GPG_ERR_NOT_SUPPORTED;
   }
-  if (err) {
-    /* Fixme: After a redirection we show the old host name.  */
-    log_error(_("error connecting to '%s': %s\n"), hostportstr,
-              gpg_strerror(err));
-    goto leave;
+  /* libcurl doesn't easily support disabling all DNS lookups.  */
+  if (opt.disable_ipv4 && opt.disable_ipv6) {
+    log_error(_("CRL access not possible due to disabled %s\n"),
+              "ipv4 and ipv6");
+    return GPG_ERR_NOT_SUPPORTED;
   }
 
-  /* Wait for the response.  */
-  dirmngr_tick(ctrl);
-  err = http_wait_response(http);
-  if (err) {
-    log_error(_("error reading HTTP response for '%s': %s\n"), hostportstr,
-              gpg_strerror(err));
-    goto leave;
+  NeoPG::Proto::Http request;
+
+  /* We do it the other way around, leave URL normal and provide
+     connect_to information in curl.  */
+  NeoPG::Proto::URI uri(url);
+  if (httphost) {
+    std::string connect_to = uri.host;
+    uri.host = httphost;
+    request.set_connect_to(connect_to);
   }
 
-  if (http_get_tls_info(http, NULL)) {
-    /* Update the httpflags so that a redirect won't fallback to an
-       unencrypted connection.  */
-    httpflags |= HTTP_FLAG_FORCE_TLS;
+  request.set_url(uri.str())
+      .forbid_reuse()
+      .set_timeout(ctrl->timeout)
+      .no_cache();
+
+  if (opt.http_proxy)
+    request.set_proxy(opt.http_proxy);
+  else
+    request.default_proxy(opt.honor_http_proxy);
+
+  if (opt.disable_ipv6)
+    request.set_ipresolve(NeoPG::Proto::Http::Resolve::IPv4);
+  else if (opt.disable_ipv4)
+    request.set_ipresolve(NeoPG::Proto::Http::Resolve::IPv6);
+
+  if (post_data) /* x-www-form-urlencoded is default */
+    request.set_post(post_data);
+
+  /* SSL Config.  It all boils down to a simple switch: Normally, we
+     use the system CA list.  And for the SKS Poolserver, we take a
+     baked in CA.  */
+  if (!strcmp(httphost, "hkps.pool.sks-keyservers.net")) {
+    char *pemname =
+        make_filename_try(gnupg_datadir(), "sks-keyservers.netCA.pem", NULL);
+    request.set_cainfo(pemname);
   }
 
-  if (r_http_status) *r_http_status = http_get_status_code(http);
-
-  switch (http_get_status_code(http)) {
-    case 200:
-      err = 0;
-      break; /* Success.  */
-
-    case 301:
-    case 302:
-    case 307: {
-      const char *s = http_get_header(http, "Location");
-
-      log_info(_("URL '%s' redirected to '%s' (%u)\n"), request,
-               s ? s : "[none]", http_get_status_code(http));
-      if (s && *s && redirects_left--) {
-        xfree(request_buffer);
-        request_buffer = xtrystrdup(s);
-        if (request_buffer) {
-          request = request_buffer;
-          http_close(http, 0);
-          http = NULL;
-          goto once_more;
-        }
-        err = gpg_error_from_syserror();
-      } else
-        err = GPG_ERR_NO_DATA;
-      log_error(_("too many redirections\n"));
-    }
-      goto leave;
-
-    case 501:
-      err = GPG_ERR_NOT_IMPLEMENTED;
-      goto leave;
-
-    default:
-      log_error(_("error accessing '%s': http status %u\n"), request,
-                http_get_status_code(http));
-      err = GPG_ERR_NO_DATA;
-      goto leave;
+  try {
+    response = request.fetch();
+  } catch (const std::runtime_error &e) {
+    log_error(_("error retrieving '%s': %s\n"), url, e.what());
+    return GPG_ERR_NO_DATA;
   }
 
-  /* FIXME: We should register a permanent redirection and whether a
-     host has ever used TLS so that future calls will always use
-     TLS. */
-
-  fp = http_get_read_ptr(http);
-  if (!fp) {
-    err = GPG_ERR_BUG;
-    goto leave;
-  }
-
-  /* Return the read stream and close the HTTP context.  */
-  *r_fp = fp;
-  http_close(http, 1);
-  http = NULL;
-
-leave:
-  http_close(http, 0);
-  http_session_release(session);
-  xfree(request_buffer);
-  return err;
+  return 0;
 }
 
 /* Helper to evaluate the error code ERR from a send_request() call
@@ -1033,23 +973,19 @@ static int handle_send_request_error(ctrl_t ctrl, gpg_error_t err,
 }
 
 /* Search the keyserver identified by URI for keys matching PATTERN.
-   On success R_FP has an open stream to read the data.  If
-   R_HTTP_STATUS is not NULL, the http status code will be stored
-   there.  */
+   On success, data is in RESPONSE.  If R_HTTP_STATUS is not NULL, the
+   http status code will be stored there.  */
 gpg_error_t ks_hkp_search(ctrl_t ctrl, parsed_uri_t uri, const char *pattern,
-                          estream_t *r_fp, unsigned int *r_http_status) {
+                          std::string &response, unsigned int *r_http_status) {
   gpg_error_t err;
   KEYDB_SEARCH_DESC desc;
   char fprbuf[2 + 40 + 1];
   char *hostport = NULL;
   char *request = NULL;
-  estream_t fp = NULL;
   int reselect;
   unsigned int httpflags;
   char *httphost = NULL;
   unsigned int tries = SEND_REQUEST_RETRIES;
-
-  *r_fp = NULL;
 
   /* Remove search type indicator and adjust PATTERN accordingly.
      Note that HKP keyservers like the 0x to be present when searching
@@ -1093,7 +1029,7 @@ gpg_error_t ks_hkp_search(ctrl_t ctrl, parsed_uri_t uri, const char *pattern,
   /* Build the request string.  */
   reselect = 0;
 again : {
-  char *searchkey;
+  std::string searchkey;
 
   xfree(hostport);
   hostport = NULL;
@@ -1104,15 +1040,10 @@ again : {
   if (err) goto leave;
 
   searchkey = http_escape_string(pattern, EXTRA_ESCAPE_CHARS);
-  if (!searchkey) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
 
   xfree(request);
-  request = strconcat(
-      hostport, "/pks/lookup?op=index&options=mr&search=", searchkey, NULL);
-  xfree(searchkey);
+  request = strconcat(hostport, "/pks/lookup?op=index&options=mr&search=",
+                      searchkey.c_str(), NULL);
   if (!request) {
     err = gpg_error_from_syserror();
     goto leave;
@@ -1120,8 +1051,9 @@ again : {
 }
 
   /* Send the request.  */
-  err = send_request(ctrl, request, hostport, httphost, httpflags, NULL, NULL,
-                     &fp, r_http_status);
+  response.clear();
+  err = send_request(ctrl, request, hostport, httphost, httpflags, boost::none,
+                     response, r_http_status);
   if (handle_send_request_error(ctrl, err, request, &tries)) {
     reselect = 1;
     goto again;
@@ -1132,28 +1064,14 @@ again : {
   if (err) goto leave;
 
   /* Peek at the response.  */
-  {
-    int c = es_getc(fp);
-    if (c == -1) {
-      err = es_ferror(fp) ? gpg_error_from_syserror() : GPG_ERR_EOF;
-      log_error("error reading response: %s\n", gpg_strerror(err));
-      goto leave;
-    }
-    if (c == '<') {
-      /* The document begins with a '<': Assume a HTML response,
-         which we don't support.  */
-      err = GPG_ERR_UNSUPPORTED_ENCODING;
-      goto leave;
-    }
-    es_ungetc(c, fp);
-  }
-
-  /* Return the read stream.  */
-  *r_fp = fp;
-  fp = NULL;
+  if (response.size() == 0)
+    err = GPG_ERR_EOF;
+  else if (response[0] == '<')
+    /* The document begins with a '<': Assume a HTML response,
+       which we don't support.  */
+    err = GPG_ERR_UNSUPPORTED_ENCODING;
 
 leave:
-  es_fclose(fp);
   xfree(request);
   xfree(hostport);
   xfree(httphost);
@@ -1161,25 +1079,22 @@ leave:
 }
 
 /* Get the key described key the KEYSPEC string from the keyserver
-   identified by URI.  On success R_FP has an open stream to read the
-   data.  The data will be provided in a format GnuPG can import
-   (either a binary OpenPGP message or an armored one).  */
+   identified by URI.  On success data is in RESPONSE.  The data will
+   be provided in a format GnuPG can import (either a binary OpenPGP
+   message or an armored one).  */
 gpg_error_t ks_hkp_get(ctrl_t ctrl, parsed_uri_t uri, const char *keyspec,
-                       estream_t *r_fp) {
+                       std::string &response) {
   gpg_error_t err;
   KEYDB_SEARCH_DESC desc;
   char kidbuf[2 + 40 + 1];
   const char *exactname = NULL;
-  char *searchkey = NULL;
+  std::string searchkey;
   char *hostport = NULL;
   char *request = NULL;
-  estream_t fp = NULL;
   int reselect;
   char *httphost = NULL;
   unsigned int httpflags;
   unsigned int tries = SEND_REQUEST_RETRIES;
-
-  *r_fp = NULL;
 
   /* Remove search type indicator and adjust PATTERN accordingly.
      Note that HKP keyservers like the 0x to be present when searching
@@ -1216,10 +1131,6 @@ gpg_error_t ks_hkp_get(ctrl_t ctrl, parsed_uri_t uri, const char *keyspec,
 
   searchkey =
       http_escape_string(exactname ? exactname : kidbuf, EXTRA_ESCAPE_CHARS);
-  if (!searchkey) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
 
   reselect = 0;
 again:
@@ -1233,17 +1144,17 @@ again:
   if (err) goto leave;
 
   xfree(request);
-  request =
-      strconcat(hostport, "/pks/lookup?op=get&options=mr&search=", searchkey,
-                exactname ? "&exact=on" : "", NULL);
+  request = strconcat(hostport, "/pks/lookup?op=get&options=mr&search=",
+                      searchkey.c_str(), exactname ? "&exact=on" : "", NULL);
   if (!request) {
     err = gpg_error_from_syserror();
     goto leave;
   }
 
   /* Send the request.  */
-  err = send_request(ctrl, request, hostport, httphost, httpflags, NULL, NULL,
-                     &fp, NULL);
+  response.clear();
+  err = send_request(ctrl, request, hostport, httphost, httpflags, boost::none,
+                     response, NULL);
   if (handle_send_request_error(ctrl, err, request, &tries)) {
     reselect = 1;
     goto again;
@@ -1253,41 +1164,10 @@ again:
   err = dirmngr_status(ctrl, "SOURCE", hostport, NULL);
   if (err) goto leave;
 
-  /* Return the read stream and close the HTTP context.  */
-  *r_fp = fp;
-  fp = NULL;
-
 leave:
-  es_fclose(fp);
   xfree(request);
   xfree(hostport);
   xfree(httphost);
-  xfree(searchkey);
-  return err;
-}
-
-/* Callback parameters for put_post_cb.  */
-struct put_post_parm_s {
-  char *datastring;
-};
-
-/* Helper for ks_hkp_put.  */
-static gpg_error_t put_post_cb(void *opaque, http_t http) {
-  struct put_post_parm_s *parm = (put_post_parm_s *)opaque;
-  gpg_error_t err = 0;
-  estream_t fp;
-  size_t len;
-
-  fp = http_get_write_ptr(http);
-  len = strlen(parm->datastring);
-
-  es_fprintf(fp,
-             "Content-Type: application/x-www-form-urlencoded\r\n"
-             "Content-Length: %zu\r\n",
-             len + 8 /* 8 is for "keytext" */);
-  http_start_data(http);
-  if (es_fputs("keytext=", fp) || es_write(fp, parm->datastring, len, NULL))
-    err = gpg_error_from_syserror();
   return err;
 }
 
@@ -1297,24 +1177,20 @@ gpg_error_t ks_hkp_put(ctrl_t ctrl, parsed_uri_t uri, const void *data,
   gpg_error_t err;
   char *hostport = NULL;
   char *request = NULL;
-  estream_t fp = NULL;
-  struct put_post_parm_s parm;
   char *armored = NULL;
   int reselect;
   char *httphost = NULL;
   unsigned int httpflags;
   unsigned int tries = SEND_REQUEST_RETRIES;
-
-  parm.datastring = NULL;
+  std::string response;
+  std::string post_data;
 
   err = armor_data(&armored, data, datalen);
   if (err) goto leave;
 
-  parm.datastring = http_escape_string(armored, EXTRA_ESCAPE_CHARS);
-  if (!parm.datastring) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
+  post_data = "keytext=";
+  post_data += http_escape_string(armored, EXTRA_ESCAPE_CHARS);
+
   xfree(armored);
   armored = NULL;
 
@@ -1337,8 +1213,9 @@ again:
   }
 
   /* Send the request.  */
-  err = send_request(ctrl, request, hostport, httphost, 0, put_post_cb, &parm,
-                     &fp, NULL);
+  response.clear();
+  err = send_request(ctrl, request, hostport, httphost, 0, post_data, response,
+                     NULL);
   if (handle_send_request_error(ctrl, err, request, &tries)) {
     reselect = 1;
     goto again;
@@ -1346,8 +1223,6 @@ again:
   if (err) goto leave;
 
 leave:
-  es_fclose(fp);
-  xfree(parm.datastring);
   xfree(armored);
   xfree(request);
   xfree(hostport);

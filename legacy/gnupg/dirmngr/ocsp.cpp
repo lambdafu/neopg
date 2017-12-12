@@ -24,9 +24,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <neopg/proto/http.h>
+
 #include "certcache.h"
 #include "dirmngr.h"
-#include "http.h"
 #include "misc.h"
 #include "ocsp.h"
 #include "validate.h"
@@ -108,19 +109,22 @@ static gpg_error_t do_ocsp_request(ctrl_t ctrl, ksba_ocsp_t ocsp,
                                    gcry_md_hd_t md, const char *url,
                                    ksba_cert_t cert, ksba_cert_t issuer_cert) {
   gpg_error_t err;
-  unsigned char *request, *response;
-  size_t requestlen, responselen;
-  http_t http;
+  char *post;
+  size_t postlen;
   ksba_ocsp_response_status_t response_status;
   const char *t;
-  int redirects_left = 2;
-  char *free_this = NULL;
-  std::vector<std::string> headers;
+  std::string response;
 
   (void)ctrl;
 
   if (opt.disable_http) {
     log_error(_("OCSP request not possible due to disabled HTTP\n"));
+    return GPG_ERR_NOT_SUPPORTED;
+  }
+  /* libcurl doesn't easily support disabling all DNS lookups.  */
+  if (opt.disable_ipv4 && opt.disable_ipv6) {
+    log_error(_("OCSP request not possible due to disabled %s\n"),
+              "ipv4 and ipv6");
     return GPG_ERR_NOT_SUPPORTED;
   }
 
@@ -140,96 +144,44 @@ static gpg_error_t do_ocsp_request(ctrl_t ctrl, ksba_ocsp_t ocsp,
     ksba_ocsp_set_nonce(ocsp, nonce, n);
   }
 
-  err = ksba_ocsp_build_request(ocsp, &request, &requestlen);
+  err = ksba_ocsp_build_request(ocsp, (unsigned char **)&post, &postlen);
   if (err) {
     log_error(_("error building OCSP request: %s\n"), gpg_strerror(err));
     return err;
   }
 
-once_more:
-  err = http_open(&http, HTTP_REQ_POST, url, NULL, NULL,
-                  ((opt.honor_http_proxy ? HTTP_FLAG_TRY_PROXY : 0) |
-                   (opt.disable_ipv4 ? HTTP_FLAG_IGNORE_IPv4 : 0) |
-                   (opt.disable_ipv6 ? HTTP_FLAG_IGNORE_IPv6 : 0)),
-                  ctrl->http_proxy, NULL, headers);
-  if (err) {
-    log_error(_("error connecting to '%s': %s\n"), url, gpg_strerror(err));
-    xfree(free_this);
-    return err;
+  NeoPG::Proto::Http request;
+  request.set_url(url).forbid_reuse().set_timeout(ctrl->timeout).no_cache();
+
+  if (opt.http_proxy)
+    request.set_proxy(opt.http_proxy);
+  else
+    request.default_proxy(opt.honor_http_proxy);
+
+  if (opt.disable_ipv6)
+    request.set_ipresolve(NeoPG::Proto::Http::Resolve::IPv4);
+  else if (opt.disable_ipv4)
+    request.set_ipresolve(NeoPG::Proto::Http::Resolve::IPv6);
+
+  request.m_header["Content-Type"] = "application/ocsp-request";
+  request.set_post(post, postlen);
+  xfree(post);
+
+  try {
+    response = request.fetch();
+  } catch (const std::runtime_error &e) {
+    log_error(_("error retrieving '%s': %s\n"), url, e.what());
+    return GPG_ERR_NO_DATA;
   }
 
-  es_fprintf(http_get_write_ptr(http),
-             "Content-Type: application/ocsp-request\r\n"
-             "Content-Length: %lu\r\n",
-             (unsigned long)requestlen);
-  http_start_data(http);
-  if (es_fwrite(request, requestlen, 1, http_get_write_ptr(http)) != 1) {
-    err = gpg_error_from_errno(errno);
-    log_error("error sending request to '%s': %s\n", url, strerror(errno));
-    http_close(http, 0);
-    xfree(request);
-    xfree(free_this);
-    return err;
-  }
-  xfree(request);
-  request = NULL;
+  const unsigned char *response_ = (const unsigned char *)response.data();
+  size_t responselen = response.size();
 
-  err = http_wait_response(http);
-  if (err || http_get_status_code(http) != 200) {
-    if (err)
-      log_error(_("error reading HTTP response for '%s': %s\n"), url,
-                gpg_strerror(err));
-    else {
-      switch (http_get_status_code(http)) {
-        case 301:
-        case 302: {
-          const char *s = http_get_header(http, "Location");
-
-          log_info(_("URL '%s' redirected to '%s' (%u)\n"), url,
-                   s ? s : "[none]", http_get_status_code(http));
-          if (s && *s && redirects_left--) {
-            xfree(free_this);
-            url = NULL;
-            free_this = xtrystrdup(s);
-            if (!free_this)
-              err = gpg_error_from_errno(errno);
-            else {
-              url = free_this;
-              http_close(http, 0);
-              goto once_more;
-            }
-          } else
-            err = GPG_ERR_NO_DATA;
-          log_error(_("too many redirections\n"));
-        } break;
-
-        default:
-          log_error(_("error accessing '%s': http status %u\n"), url,
-                    http_get_status_code(http));
-          err = GPG_ERR_NO_DATA;
-          break;
-      }
-    }
-    http_close(http, 0);
-    xfree(free_this);
-    return err;
-  }
-
-  err = read_response(http_get_read_ptr(http), &response, &responselen);
-  http_close(http, 0);
-  if (err) {
-    log_error(_("error reading HTTP response for '%s': %s\n"), url,
-              gpg_strerror(err));
-    xfree(free_this);
-    return err;
-  }
-
-  err = ksba_ocsp_parse_response(ocsp, response, responselen, &response_status);
+  err =
+      ksba_ocsp_parse_response(ocsp, response_, responselen, &response_status);
   if (err) {
     log_error(_("error parsing OCSP response for '%s': %s\n"), url,
               gpg_strerror(err));
-    xfree(response);
-    xfree(free_this);
     return err;
   }
 
@@ -268,7 +220,7 @@ once_more:
   if (response_status == KSBA_OCSP_RSPSTATUS_SUCCESS) {
     if (opt.verbose) log_info(_("OCSP responder at '%s' status: %s\n"), url, t);
 
-    err = ksba_ocsp_hash_response(ocsp, response, responselen, HASH_FNC, md);
+    err = ksba_ocsp_hash_response(ocsp, response_, responselen, HASH_FNC, md);
     if (err)
       log_error(_("hashing the OCSP response for '%s' failed: %s\n"), url,
                 gpg_strerror(err));
@@ -277,8 +229,6 @@ once_more:
     err = GPG_ERR_GENERAL;
   }
 
-  xfree(response);
-  xfree(free_this);
   return err;
 }
 

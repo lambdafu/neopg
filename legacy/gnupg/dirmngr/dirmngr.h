@@ -196,11 +196,4 @@ gpg_error_t dirmngr_status(ctrl_t ctrl, const char *keyword, ...);
 gpg_error_t dirmngr_status_help(ctrl_t ctrl, const char *text);
 gpg_error_t dirmngr_tick(ctrl_t ctrl);
 
-/*-- http-ntbtls.c --*/
-/* Note that we don't use a callback for gnutls.  */
-
-gpg_error_t gnupg_http_tls_verify_cb(void *opaque, http_t http,
-                                     http_session_t session, unsigned int flags,
-                                     void *tls_context);
-
 #endif /*DIRMNGR_H*/

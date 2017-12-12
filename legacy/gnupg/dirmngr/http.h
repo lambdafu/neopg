@@ -65,8 +65,6 @@ struct parsed_uri_s {
 };
 typedef struct parsed_uri_s *parsed_uri_t;
 
-struct uri_tuple_s *uri_query_lookup(parsed_uri_t uri, const char *key);
-
 typedef enum {
   HTTP_REQ_GET = 1,
   HTTP_REQ_HEAD = 2,
@@ -115,10 +113,6 @@ gpg_error_t http_parse_uri(parsed_uri_t *ret_uri, const char *uri,
 
 void http_release_parsed_uri(parsed_uri_t uri);
 
-gpg_error_t http_raw_connect(http_t *r_hd, const char *server,
-                             unsigned short port, unsigned int flags,
-                             unsigned int timeout);
-
 gpg_error_t http_open(http_t *r_hd, http_req_t reqtype, const char *url,
                       const char *httphost, const char *auth,
                       unsigned int flags, const char *proxy,
@@ -141,10 +135,8 @@ estream_t http_get_write_ptr(http_t hd);
 unsigned int http_get_status_code(http_t hd);
 const char *http_get_tls_info(http_t hd, const char *what);
 const char *http_get_header(http_t hd, const char *name);
-const char **http_get_header_names(http_t hd);
 gpg_error_t http_verify_server_credentials(http_session_t sess);
 
-char *http_escape_string(const char *string, const char *specials);
-char *http_escape_data(const void *data, size_t datalen, const char *specials);
+std::string http_escape_string(const char *string, const char *specials);
 
 #endif /*GNUPG_COMMON_HTTP_H*/

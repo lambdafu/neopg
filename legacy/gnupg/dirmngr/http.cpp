@@ -236,9 +236,6 @@ struct http_context_s {
 static int opt_verbose;
 static int opt_debug;
 
-/* The global callback for the verification function.  */
-static gpg_error_t (*tls_callback)(http_t, http_session_t, int);
-
 /* The list of files with trusted CA certificates.  */
 static std::vector<std::pair<std::string, unsigned int>> tls_ca_certlist;
 
@@ -368,14 +365,6 @@ static char *make_header_line(const char *prefix, const char *suffix,
 void http_set_verbose(int verbose, int debug) {
   opt_verbose = verbose;
   opt_debug = debug;
-}
-
-/* Register a non-standard global TLS callback function.  If no
-   verification is desired a callback needs to be registered which
-   always returns NULL.  */
-void http_register_tls_callback(gpg_error_t (*cb)(http_t, http_session_t,
-                                                  int)) {
-  tls_callback = cb;
 }
 
 /* Register a CA certificate for future use.  The certificate is
@@ -630,89 +619,6 @@ gpg_error_t http_open(http_t *r_hd, http_req_t reqtype, const char *url,
     if (hd->fp_read) es_fclose(hd->fp_read);
     if (hd->fp_write) es_fclose(hd->fp_write);
     http_session_unref(hd->session);
-    xfree(hd);
-  } else
-    *r_hd = hd;
-  return err;
-}
-
-/* This function is useful to connect to a generic TCP service using
-   this http abstraction layer.  This has the advantage of providing
-   service tags and an estream interface.  TIMEOUT is in milliseconds. */
-gpg_error_t http_raw_connect(http_t *r_hd, const char *server,
-                             unsigned short port, unsigned int flags,
-                             unsigned int timeout) {
-  gpg_error_t err = 0;
-  http_t hd;
-  cookie_t cookie;
-
-  *r_hd = NULL;
-
-  /* Create the handle. */
-  hd = (http_t)xtrycalloc(1, sizeof *hd);
-  if (!hd) return gpg_error_from_syserror();
-  hd->magic = HTTP_CONTEXT_MAGIC;
-  hd->req_type = HTTP_REQ_OPAQUE;
-  hd->flags = flags;
-
-  /* Connect.  */
-  {
-    assuan_fd_t sock;
-
-    err = connect_server(server, port, hd->flags, timeout, &sock);
-    if (err) {
-      xfree(hd);
-      return err;
-    }
-    hd->sock = my_socket_new(sock);
-    if (!hd->sock) {
-      err = gpg_error_from_syserror();
-      xfree(hd);
-      return err;
-    }
-  }
-
-  /* Setup estreams for reading and writing.  */
-  cookie = (cookie_t)xtrycalloc(1, sizeof *cookie);
-  if (!cookie) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
-  cookie->sock = my_socket_ref(hd->sock);
-  hd->fp_write = es_fopencookie(cookie, "w", cookie_functions);
-  if (!hd->fp_write) {
-    err = gpg_error_from_syserror();
-    my_socket_unref(cookie->sock, NULL, NULL);
-    xfree(cookie);
-    goto leave;
-  }
-  hd->write_cookie = cookie; /* Cookie now owned by FP_WRITE.  */
-
-  cookie = (cookie_t)xtrycalloc(1, sizeof *cookie);
-  if (!cookie) {
-    err = gpg_error_from_syserror();
-    goto leave;
-  }
-  cookie->sock = my_socket_ref(hd->sock);
-  hd->fp_read = es_fopencookie(cookie, "r", cookie_functions);
-  if (!hd->fp_read) {
-    err = gpg_error_from_syserror();
-    my_socket_unref(cookie->sock, NULL, NULL);
-    xfree(cookie);
-    goto leave;
-  }
-  hd->read_cookie = cookie; /* Cookie now owned by FP_READ.  */
-
-  /* Register close notification to interlock the use of es_fclose in
-     http_close and in user code.  */
-  err = es_onclose(hd->fp_write, 1, fp_onclose_notification, hd);
-  if (!err) err = es_onclose(hd->fp_read, 1, fp_onclose_notification, hd);
-
-leave:
-  if (err) {
-    if (hd->fp_read) es_fclose(hd->fp_read);
-    if (hd->fp_write) es_fclose(hd->fp_write);
-    my_socket_unref(hd->sock, NULL, NULL);
     xfree(hd);
   } else
     *r_hd = hd;
@@ -1095,7 +1001,7 @@ static int insert_escapes(char *buffer, const char *string,
    example "+" and "/: often needs to be escaped too.  Returns NULL on
    failure and sets ERRNO.  If SPECIAL is NULL a dedicated forms
    encoding mode is used. */
-char *http_escape_string(const char *string, const char *specials) {
+std::string http_escape_string(const char *string, const char *specials) {
   int n;
   char *buf;
 
@@ -1105,26 +1011,9 @@ char *http_escape_string(const char *string, const char *specials) {
     insert_escapes(buf, string, specials);
     buf[n] = 0;
   }
-  return buf;
-}
-
-/* Allocate a new string from {DATA,DATALEN} using standard HTTP
-   escaping as well as escaping of characters given in SPECIALS.  A
-   common pattern for SPECIALS is "%;?&=".  However it depends on the
-   needs, for example "+" and "/: often needs to be escaped too.
-   Returns NULL on failure and sets ERRNO.  If SPECIAL is NULL a
-   dedicated forms encoding mode is used. */
-char *http_escape_data(const void *data, size_t datalen, const char *specials) {
-  int n;
-  char *buf;
-
-  n = escape_data(NULL, data, datalen, specials);
-  buf = (char *)xtrymalloc(n + 1);
-  if (buf) {
-    escape_data(buf, data, datalen, specials);
-    buf[n] = 0;
-  }
-  return buf;
+  std::string result = buf;
+  xfree(buf);
+  return result;
 }
 
 static uri_tuple_t parse_tuple(char *string) {
@@ -1314,10 +1203,7 @@ static gpg_error_t send_request(http_t hd, const char *httphost,
     }
 
     hd->session->verify.done = 0;
-    if (tls_callback)
-      err = tls_callback(hd, hd->session, 0);
-    else
-      err = http_verify_server_credentials(hd->session);
+    err = http_verify_server_credentials(hd->session);
     if (err) {
       log_info("TLS connection authentication failed: %s\n", gpg_strerror(err));
       xfree(proxy_authstr);
@@ -1579,24 +1465,6 @@ const char *http_get_header(http_t hd, const char *name) {
   for (h = hd->headers; h; h = h->next)
     if (!strcmp(h->name, name)) return h->value;
   return NULL;
-}
-
-/* Return a newly allocated and NULL terminated array with pointers to
-   header names.  The array must be released with xfree() and its
-   content is only values as long as no other request has been
-   send.  */
-const char **http_get_header_names(http_t hd) {
-  const char **array;
-  size_t n;
-  header_t h;
-
-  for (n = 0, h = hd->headers; h; h = h->next) n++;
-  array = (const char **)xtrycalloc(n + 1, sizeof *array);
-  if (array) {
-    for (n = 0, h = hd->headers; h; h = h->next) array[n++] = h->name;
-  }
-
-  return array;
 }
 
 /*
@@ -2295,15 +2163,4 @@ gpg_error_t http_verify_server_credentials(http_session_t sess) {
   }
 
   return err;
-}
-
-/* Return the first query variable with the specified key.  If there
-   is no such variable, return NULL.  */
-struct uri_tuple_s *uri_query_lookup(parsed_uri_t uri, const char *key) {
-  struct uri_tuple_s *t;
-
-  for (t = uri->query; t; t = t->next)
-    if (strcmp(t->name, key) == 0) return t;
-
-  return NULL;
 }
