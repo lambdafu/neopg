@@ -32,7 +32,6 @@
 #define GNUPG_COMMON_HTTP_H
 
 #include <string>
-#include <vector>
 
 #include <gpg-error.h>
 
@@ -65,77 +64,10 @@ struct parsed_uri_s {
 };
 typedef struct parsed_uri_s *parsed_uri_t;
 
-typedef enum {
-  HTTP_REQ_GET = 1,
-  HTTP_REQ_HEAD = 2,
-  HTTP_REQ_POST = 3,
-  HTTP_REQ_OPAQUE = 4 /* Internal use.  */
-} http_req_t;
-
-/* We put the flag values into an enum, so that gdb can display them. */
-enum {
-  HTTP_FLAG_TRY_PROXY = 1,     /* Try to use a proxy.  */
-  HTTP_FLAG_SHUTDOWN = 2,      /* Close sending end after the request.  */
-  HTTP_FLAG_LOG_RESP = 8,      /* Log the server response.  */
-  HTTP_FLAG_FORCE_TLS = 16,    /* Force the use of TLS.  */
-  HTTP_FLAG_IGNORE_CL = 32,    /* Ignore content-length.  */
-  HTTP_FLAG_IGNORE_IPv4 = 64,  /* Do not use IPv4.  */
-  HTTP_FLAG_IGNORE_IPv6 = 128, /* Do not use IPv6.  */
-  HTTP_FLAG_TRUST_DEF = 256,   /* Use the CAs configured for HKP.  */
-  HTTP_FLAG_TRUST_SYS = 512,   /* Also use the system defined CAs.  */
-  HTTP_FLAG_NO_CRL = 1024      /* Do not consult CRLs for https.  */
-};
-
-struct http_session_s;
-typedef struct http_session_s *http_session_t;
-
-struct http_context_s;
-typedef struct http_context_s *http_t;
-
-void http_set_verbose(int verbose, int debug);
-
-void http_register_tls_callback(gpg_error_t (*cb)(http_t, http_session_t, int));
-void http_register_tls_ca(const char *fname);
-void http_register_netactivity_cb(void (*cb)(void));
-
-gpg_error_t http_session_new(http_session_t *r_session,
-                             const char *intended_hostname, unsigned int flags);
-http_session_t http_session_ref(http_session_t sess);
-void http_session_release(http_session_t sess);
-
-void http_session_set_log_cb(http_session_t sess,
-                             void (*cb)(http_session_t, gpg_error_t,
-                                        const char *, const void **, size_t *));
-void http_session_set_timeout(http_session_t sess, unsigned int timeout);
-
 gpg_error_t http_parse_uri(parsed_uri_t *ret_uri, const char *uri,
                            int no_scheme_check);
 
 void http_release_parsed_uri(parsed_uri_t uri);
-
-gpg_error_t http_open(http_t *r_hd, http_req_t reqtype, const char *url,
-                      const char *httphost, const char *auth,
-                      unsigned int flags, const char *proxy,
-                      http_session_t session,
-                      const std::vector<std::string> &headers);
-
-void http_start_data(http_t hd);
-
-gpg_error_t http_wait_response(http_t hd);
-
-void http_close(http_t hd, int keep_read_stream);
-
-gpg_error_t http_open_document(http_t *r_hd, const char *document,
-                               const char *auth, unsigned int flags,
-                               const char *proxy, http_session_t session,
-                               const std::vector<std::string> &headers);
-
-estream_t http_get_read_ptr(http_t hd);
-estream_t http_get_write_ptr(http_t hd);
-unsigned int http_get_status_code(http_t hd);
-const char *http_get_tls_info(http_t hd, const char *what);
-const char *http_get_header(http_t hd, const char *name);
-gpg_error_t http_verify_server_credentials(http_session_t sess);
 
 std::string http_escape_string(const char *string, const char *specials);
 

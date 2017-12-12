@@ -233,17 +233,12 @@ static int opt_gnutls_debug = -1;
 /* Counter for the active connections.  */
 static int active_connections;
 
-/* This flag is set by any network access and used by the housekeeping
- * thread to run background network tasks.  */
-static int network_activity_seen;
-
 /* A list of filenames registred with --hkp-cacert.  */
 static std::vector<std::string> hkp_cacert_filenames;
 
 /* Prototypes. */
 static void cleanup(void);
 static fingerprint_list_t parse_ocsp_signer(const char *string);
-static void netactivity_action(void);
 
 static const char *my_strusage(int level) {
   const char *p = NULL;
@@ -373,7 +368,6 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
       xfree(opt.ocsp_signer);
       opt.ocsp_signer = tmp;
     }
-    http_register_tls_ca(NULL);
     enable_standard_resolver(0);
     set_dns_timeout(0);
     opt.connect_timeout = 0;
@@ -464,13 +458,14 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
       break;
 
     case oHkpCaCert: {
+      /* FIXME: We are not supporting this anymore, but could.  */
+
       /* We need to register the filenames with gnutls (http.c) and
        * also for our own cert cache.  */
       char *tmpname;
 
       /* Do tilde expansion and make path absolute.  */
       tmpname = make_absfilename(pargs->r.ret_str, NULL);
-      http_register_tls_ca(tmpname);
       hkp_cacert_filenames.emplace_back(pargs->r.ret_str);
       xfree(tmpname);
     } break;
@@ -507,7 +502,6 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
   }
 
   set_dns_verbose(opt.verbose, !!DBG_DNS);
-  http_set_verbose(opt.verbose, !!DBG_NETWORK);
   set_dns_disable_ipv4(opt.disable_ipv4);
   set_dns_disable_ipv6(opt.disable_ipv6);
 
@@ -777,7 +771,6 @@ next_pass:
 
     cert_cache_init(hkp_cacert_filenames);
     crl_cache_init();
-    http_register_netactivity_cb(netactivity_action);
     start_command_handler();
   } else if (cmd == aListCRLs) {
     /* Just list the CRL cache and exit. */
@@ -960,12 +953,6 @@ static fingerprint_list_t parse_ocsp_signer(const char *string) {
 /*
    Stuff used in daemon mode.
  */
-
-/* This function is called if some network activity was done.  At this
- * point we know the we have a network and we can decide whether to
- * run scheduled background tasks soon.  The function should return
- * quickly and only trigger actions for another thread. */
-static void netactivity_action(void) { network_activity_seen = 1; }
 
 #ifdef HAVE_INOTIFY_INIT
 /* Read an inotify event and return true if it matches NAME.  */

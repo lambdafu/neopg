@@ -493,6 +493,7 @@ static gpg_error_t map_host(ctrl_t ctrl, const char *name, int force_reselect,
     return GPG_ERR_NO_KEYSERVER;
   }
 
+#if 0
   if (r_httpflags) {
     /* If the hosttable does not indicate that a certain host
        supports IPv<N>, we explicit set the corresponding http
@@ -502,6 +503,7 @@ static gpg_error_t map_host(ctrl_t ctrl, const char *name, int force_reselect,
     if (!hi->v4) *r_httpflags |= HTTP_FLAG_IGNORE_IPv4;
     if (!hi->v6) *r_httpflags |= HTTP_FLAG_IGNORE_IPv6;
   }
+#endif
 
   *r_host = xtrystrdup(hi->name);
   if (!*r_host) {
