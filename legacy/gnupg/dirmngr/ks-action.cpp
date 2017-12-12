@@ -76,25 +76,6 @@ gpg_error_t ks_action_help(ctrl_t ctrl, const char *url) {
   return err;
 }
 
-/* Resolve all host names.  This is useful for looking at the status
-   of configured keyservers.  */
-gpg_error_t ks_action_resolve(ctrl_t ctrl, uri_item_t keyservers) {
-  gpg_error_t err = 0;
-  int any_server = 0;
-  uri_item_t uri;
-
-  for (uri = keyservers; !err && uri; uri = uri->next) {
-    if (uri->parsed_uri->is_http) {
-      any_server = 1;
-      err = ks_hkp_resolve(ctrl, uri->parsed_uri);
-      if (err) break;
-    }
-  }
-
-  if (!any_server) err = GPG_ERR_NO_KEYSERVER;
-  return err;
-}
-
 /* Search all configured keyservers for keys matching PATTERNS and
    write the result to the provided output stream.  */
 gpg_error_t ks_action_search(ctrl_t ctrl, uri_item_t keyservers,

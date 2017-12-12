@@ -45,7 +45,6 @@
 #include "crlfetch.h"
 #include "dns-stuff.h"
 #include "ks-action.h"
-#include "ks-engine.h" /* (ks_hkp_print_hosttable) */
 #include "misc.h"
 #include "ocsp.h"
 #include "validate.h"
@@ -1211,14 +1210,10 @@ leave:
 }
 
 static const char hlp_keyserver[] =
-    "KEYSERVER [<options>] [<uri>|<host>]\n"
+    "KEYSERVER [<options>] <uri>\n"
     "Options are:\n"
     "  --help\n"
     "  --clear      Remove all configured keyservers\n"
-    "  --resolve    Resolve HKP host names and rotate\n"
-    "  --hosttable  Print table of known hosts and pools\n"
-    "  --dead       Mark <host> as dead\n"
-    "  --alive      Mark <host> as alive\n"
     "\n"
     "If called without arguments list all configured keyserver URLs.\n"
     "If called with an URI add this as keyserver.  Note that keyservers\n"
@@ -1231,17 +1226,12 @@ static const char hlp_keyserver[] =
 static gpg_error_t cmd_keyserver(assuan_context_t ctx, char *line) {
   ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
   gpg_error_t err = 0;
-  int clear_flag, add_flag, help_flag, host_flag, resolve_flag;
-  int dead_flag, alive_flag;
+  int clear_flag, add_flag, help_flag;
   uri_item_t item = NULL; /* gcc 4.4.5 is not able to detect that it
                              is always initialized.  */
 
   clear_flag = has_option(line, "--clear");
   help_flag = has_option(line, "--help");
-  resolve_flag = has_option(line, "--resolve");
-  host_flag = has_option(line, "--hosttable");
-  dead_flag = has_option(line, "--dead");
-  alive_flag = has_option(line, "--alive");
   line = skip_options(line);
   add_flag = !!*line;
 
@@ -1249,32 +1239,6 @@ static gpg_error_t cmd_keyserver(assuan_context_t ctx, char *line) {
     err = ks_action_help(ctrl, line);
     goto leave;
   }
-
-  if (resolve_flag) {
-    err = ensure_keyserver(ctrl);
-    if (!err) err = ks_action_resolve(ctrl, ctrl->server_local->keyservers);
-    if (err) goto leave;
-  }
-
-  if (alive_flag && dead_flag) {
-    err = set_error(GPG_ERR_ASS_PARAMETER, "no support for zombies");
-    goto leave;
-  }
-  if (alive_flag || dead_flag) {
-    if (!*line) {
-      err = set_error(GPG_ERR_ASS_PARAMETER, "name of host missing");
-      goto leave;
-    }
-
-    err = ks_hkp_mark_host(ctrl, line, alive_flag);
-    if (err) goto leave;
-  }
-
-  if (host_flag) {
-    err = ks_hkp_print_hosttable(ctrl);
-    if (err) goto leave;
-  }
-  if (resolve_flag || host_flag || alive_flag || dead_flag) goto leave;
 
   if (add_flag) {
     err = make_keyserver_item(line, &item);

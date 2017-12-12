@@ -25,7 +25,6 @@
 #include <vector>
 
 gpg_error_t ks_action_help(ctrl_t ctrl, const char *url);
-gpg_error_t ks_action_resolve(ctrl_t ctrl, uri_item_t keyservers);
 gpg_error_t ks_action_search(ctrl_t ctrl, uri_item_t keyservers,
                              const std::vector<std::string> &patterns,
                              estream_t outfp);
