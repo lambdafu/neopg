@@ -16,6 +16,8 @@ add_executable(test-neopg
   openpgp/trust_packet.cpp
   utils/stream.cpp
   parser/openpgp.cpp
+  proto/uri.cpp
+  proto/http.cpp
 )
 
 target_compile_options(test-neopg

@@ -23,6 +23,8 @@ add_library(libneopg
   ../include/neopg/openpgp/compressed_data_packet.h
   ../include/neopg/openpgp/trust_packet.h
   ../include/neopg/parser/openpgp.h
+  ../include/neopg/proto/uri.h
+  ../include/neopg/proto/http.h
   ../include/neopg/utils/time.h
   utils/time.cpp
   utils/stream.cpp
@@ -38,6 +40,8 @@ add_library(libneopg
   openpgp/symmetrically_encrypted_data_packet.cpp
   openpgp/compressed_data_packet.cpp
   openpgp/trust_packet.cpp
+  proto/uri.cpp
+  proto/http.cpp
 )
 
 target_compile_options(libneopg
@@ -52,8 +56,10 @@ target_include_directories(libneopg PUBLIC
    ${GTEST_INCLUDE_DIR}
    ${Boost_INCLUDE_DIR}
    ${BOTAN2_INCLUDE_DIRS}
+   ${CURL_INCLUDE_DIRS}
 )
 
-target_link_libraries(libneopg PRIVATE
+target_link_libraries(libneopg PUBLIC
 ${BOTAN2_LDFLAGS} ${BOTAN2_LIBRARIES}
+${CURL_LDFLAGS} ${CURL_LIBRARIES}
 )

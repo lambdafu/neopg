@@ -23,6 +23,13 @@ license.txt for details.
 The dependencies are also released under their respective various
 licenses.
 
+Note: As we are using libcurl, you might have to pay attention to
+possible license incompatibilities between the GPL as used by the
+legacy gnupg code and the TLS library linked to libcurl.  In the
+future, when libcurl supports Botan as TLS option, we might include a
+copy and link statically to make this easier.
+
+
 ## Installation
 
 ### Supported Compiler Versions
@@ -41,7 +48,8 @@ Aside from a working C++ toolchain you'll need the following libraries.
 2. SQLite >= 3.0
 3. Botan >= 2.0 --with-zlib --with-bzip2
 4. Boost >= 1.64.0
-5. gettext-tools
+5. libcurl >= 7.49.0
+6. gettext-tools
 
 ### Make
 

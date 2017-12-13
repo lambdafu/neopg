@@ -11,6 +11,8 @@
 #include <boost/format.hpp>
 #include <boost/locale.hpp>
 
+#include <curl/curl.h>
+
 //#define _ boost::locale::translate
 #define _ boost::locale::gettext
 
@@ -89,6 +91,14 @@ int main(int argc, char* argv[]) {
   setmode(fileno(stdin), O_BINARY);
   setmode(fileno(stdout), O_BINARY);
 #endif
+
+  /* FIXME: This has to move into a neopg_init function.  We can't
+     even use a global static constructor, because those are called
+     from DllMain on Windows, and that's not allowed.  :( */
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    std::cerr << "Failed to initialize CURL!\n";
+    return 1;
+  }
 
   /* Initialize translations.  */
   setup_locale();

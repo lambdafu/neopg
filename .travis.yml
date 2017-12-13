@@ -7,6 +7,7 @@ addons:
   apt:
     sources:
       - sourceline: 'ppa:samuel-bachmann/boost'
+      - sourceline: 'ppa:jonathonf/curl'
     packages: &base_packages
       - libsqlite3-dev
       - libbotan1.10-dev
@@ -22,6 +23,7 @@ addons:
       - libusb-1.0-0-dev
       - libbz2-dev
       - libgnutls-dev
+      - libcurl4-gnutls-dev
       - gettext
 
 matrix:
@@ -31,6 +33,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
           packages:
             - *base_packages
@@ -43,6 +46,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
           packages:
             - *base_packages
@@ -55,6 +59,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
           packages:
             - *base_packages
@@ -67,6 +72,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
           packages:
             - *base_packages
@@ -80,6 +86,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
           packages:
             - *base_packages
@@ -92,6 +99,7 @@ matrix:
 #        apt:
 #          sources:
 #            - sourceline: 'ppa:samuel-bachmann/boost'
+#            - sourceline: 'ppa:jonathonf/curl'
 #            - ubuntu-toolchain-r-test
 #          packages:
 #            - *base_packages
@@ -105,6 +113,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
           packages:
             - *base_packages
             - clang++-3.5
@@ -116,6 +125,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
           packages:
             - *base_packages
             - clang++-3.6
@@ -127,6 +137,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
           packages:
             - *base_packages
             - clang++-3.8
@@ -138,6 +149,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
           packages:
             - *base_packages
             - clang++-3.9
@@ -149,6 +161,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-4.0
           packages:
@@ -162,6 +175,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-5.0
           packages:
@@ -176,6 +190,7 @@ matrix:
 #        apt:
 #          sources:
 #            - sourceline: 'ppa:samuel-bachmann/boost'
+#            - sourceline: 'ppa:jonathonf/curl'
 #            - ubuntu-toolchain-r-test
 #            - llvm-toolchain-trusty-5.0
 #          packages:
@@ -216,6 +231,7 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:samuel-bachmann/boost'
+            - sourceline: 'ppa:jonathonf/curl'
             - ubuntu-toolchain-r-test
           packages:
             - *base_packages
@@ -255,6 +271,7 @@ install:
   - |
     if [ $TRAVIS_OS_NAME = osx ]; then
       brew update
+      # MacOS comes with libcurl.
       brew install botan doxygen gettext lcov gcovr libusb gnutls
       brew link --force gettext
       # Already installed: cmake boost
