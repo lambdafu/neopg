@@ -16,6 +16,10 @@ New source code contributed by the NeoPG authors is licensed under the
 permissive `Simplified BSD` license (the same license as Botan, the
 cryptography library we want to use).
 
+AT THIS TIME, THE COMPLETE WORK IS NECESSARILY LICENSED UNDER THE MOST
+RESTRICTIVE LICENSE OF ANY OF ITS PARTS, THE GPLv3.  See the file
+license.txt for details.
+
 The dependencies are also released under their respective various
 licenses.
 
