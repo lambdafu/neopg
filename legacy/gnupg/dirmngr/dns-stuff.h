@@ -33,7 +33,4 @@
 /* Return true if NAME is a numerical IP address.  */
 int is_ip_address(const char *name);
 
-/* Return true if NAME is an onion address.  */
-int is_onion_address(const char *name);
-
 #endif /*GNUPG_DIRMNGR_DNS_STUFF_H*/

@@ -89,13 +89,3 @@ legacy:
   }
   return (ndots == 3) ? 4 : 0;
 }
-
-/* Return true if NAME is an onion address.  */
-int is_onion_address(const char *name) {
-  size_t len;
-
-  len = name ? strlen(name) : 0;
-  if (len < 8 || strcmp(name + len - 6, ".onion")) return 0;
-  /* Note that we require at least 2 characters before the suffix.  */
-  return 1; /* Yes.  */
-}

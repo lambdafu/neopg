@@ -82,9 +82,6 @@ struct server_local_s {
      terminated after the end of this session.  */
   int stopme;
 
-  /* State variable private to is_tor_running.  */
-  int tor_state;
-
   /* If the first both flags are set the assuan logging of data lines
    * is suppressed.  The count variable is used to show the number of
    * non-logged bytes.  */
@@ -228,27 +225,6 @@ static void strcpy_escaped_plus(char *d, const unsigned char *s) {
       *d++ = *s++;
   }
   *d = 0;
-}
-
-/* This function returns true if a Tor server is running.  The sattus
-   is cached for the current connection.  */
-static int is_tor_running(ctrl_t ctrl) {
-  /* Check whether we can connect to the proxy.  */
-
-  if (!ctrl || !ctrl->server_local) return 0; /* Ooops.  */
-
-  if (!ctrl->server_local->tor_state) {
-    assuan_fd_t sock;
-
-    sock = assuan_sock_connect_byname(NULL, 0, 0, NULL, ASSUAN_SOCK_TOR);
-    if (sock == ASSUAN_INVALID_FD)
-      ctrl->server_local->tor_state = -1; /* Not running.  */
-    else {
-      assuan_sock_close(sock);
-      ctrl->server_local->tor_state = 1; /* Running.  */
-    }
-  }
-  return (ctrl->server_local->tor_state > 0);
 }
 
 /* Common code for get_cert_local and get_issuer_cert_local. */
@@ -1147,9 +1123,6 @@ static gpg_error_t make_keyserver_item(const char *uri, uri_item_t *r_item) {
 static gpg_error_t ensure_keyserver(ctrl_t ctrl) {
   gpg_error_t err;
   uri_item_t item;
-  uri_item_t onion_items = NULL;
-  uri_item_t plain_items = NULL;
-  uri_item_t ui;
 
   if (ctrl->server_local->keyservers)
     return 0; /* Already set for this session.  */
@@ -1161,49 +1134,10 @@ static gpg_error_t ensure_keyserver(ctrl_t ctrl) {
 
   for (auto &ks : opt.keyserver) {
     err = make_keyserver_item(ks.c_str(), &item);
-    if (err) goto leave;
-    if (item->parsed_uri->onion) {
-      item->next = onion_items;
-      onion_items = item;
-    } else {
-      item->next = plain_items;
-      plain_items = item;
-    }
+    if (err) break;
+    item->next = ctrl->server_local->keyservers;
+    ctrl->server_local->keyservers = item;
   }
-
-  /* Decide which to use.  Note that the session has no keyservers
-     yet set. */
-  if (onion_items && !onion_items->next && plain_items && !plain_items->next) {
-    /* If there is just one onion and one plain keyserver given, we take
-       only one depending on whether Tor is running or not.  */
-    if (is_tor_running(ctrl)) {
-      ctrl->server_local->keyservers = onion_items;
-      onion_items = NULL;
-    } else {
-      ctrl->server_local->keyservers = plain_items;
-      plain_items = NULL;
-    }
-  } else if (!is_tor_running(ctrl)) {
-    /* Tor is not running.  It does not make sense to add Onion
-       addresses.  */
-    ctrl->server_local->keyservers = plain_items;
-    plain_items = NULL;
-  } else {
-    /* In all other cases add all keyservers.  */
-    ctrl->server_local->keyservers = onion_items;
-    onion_items = NULL;
-    for (ui = ctrl->server_local->keyservers; ui && ui->next; ui = ui->next)
-      ;
-    if (ui)
-      ui->next = plain_items;
-    else
-      ctrl->server_local->keyservers = plain_items;
-    plain_items = NULL;
-  }
-
-leave:
-  release_uri_item_list(onion_items);
-  release_uri_item_list(plain_items);
 
   return err;
 }

@@ -40,7 +40,6 @@ struct parsed_uri_s {
   char *scheme; /* Pointer to the scheme string (always lowercase). */
   unsigned int is_http : 1; /* This is a HTTP style URI.   */
   unsigned int v6lit : 1;   /* Host was given as a literal v6 address.  */
-  unsigned int onion : 1;   /* .onion address given.  */
   char *auth;               /* username/password for basic auth.  */
   char *host;               /* Host (converted to lowercase). */
   unsigned short port;      /* Port (always set if the host is set). */

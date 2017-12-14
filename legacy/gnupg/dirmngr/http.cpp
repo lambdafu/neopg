@@ -96,7 +96,6 @@ static gpg_error_t do_parse_uri(parsed_uri_t uri, int only_local_part,
   uri->port = 0;
   uri->is_http = 0;
   uri->v6lit = 0;
-  uri->onion = 0;
 
   /* A quick validity check. */
   if (strspn(p, VALID_URI_CHARS) != n)
@@ -165,8 +164,6 @@ static gpg_error_t do_parse_uri(parsed_uri_t uri, int only_local_part,
     }
 
   } /* End global URI part. */
-
-  if (is_onion_address(uri->host)) uri->onion = 1;
 
   return 0;
 }
