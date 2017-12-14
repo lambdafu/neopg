@@ -81,7 +81,7 @@ struct dirmngr_options {
   int disable_http{0};            /* Do not use HTTP at all.  */
   int disable_ipv4{0};            /* Do not use legacy IP addresses.  */
   int disable_ipv6{0};            /* Do not use standard IP addresses.  */
-  int honor_http_proxy{0};        /* Honor the http_proxy env variable. */
+  int honor_http_proxy{1};        /* Honor the http_proxy env variable. */
   const char *http_proxy{0};      /* The default HTTP proxy.  */
   int ignore_http_dp{0};          /* Ignore HTTP CRL distribution points.  */
   int ignore_ocsp_service_url{0}; /* Ignore OCSP service URLs as given in

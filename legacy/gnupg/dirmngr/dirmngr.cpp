@@ -90,7 +90,7 @@ enum cmd_and_opt_values {
   oDisableIPv6,
   oIgnoreHTTPDP,
   oIgnoreOCSPSvcUrl,
-  oHonorHTTPProxy,
+  oNoHTTPProxy,
   oHTTPProxy,
   oOCSPResponder,
   oOCSPSigner,
@@ -178,7 +178,7 @@ static ARGPARSE_OPTS opts[] = {
     ARGPARSE_s_n(oNoGreeting, "no-greeting", "@"),
     ARGPARSE_s_s(oHomedir, "homedir", "@"),
     ARGPARSE_s_s(oHTTPWrapperProgram, "http-wrapper-program", "@"),
-    ARGPARSE_s_n(oHonorHTTPProxy, "honor-http-proxy", "@"),
+    ARGPARSE_s_n(oNoHTTPProxy, "no-http-proxy", "@"),
     ARGPARSE_s_s(oIgnoreCertExtension, "ignore-cert-extension", "@"),
     ARGPARSE_s_i(oConnectTimeout, "connect-timeout", "@"),
     ARGPARSE_s_i(oConnectQuickTimeout, "connect-quick-timeout", "@"),
@@ -405,8 +405,8 @@ static int parse_rereadable_options(ARGPARSE_ARGS *pargs, int reread) {
     case oDisableIPv6:
       opt.disable_ipv6 = 1;
       break;
-    case oHonorHTTPProxy:
-      opt.honor_http_proxy = 1;
+    case oNoHTTPProxy:
+      opt.honor_http_proxy = 0;
       break;
     case oHTTPProxy:
       opt.http_proxy = pargs->r.ret_str;
