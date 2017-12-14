@@ -72,8 +72,6 @@ static int menu_changeusage(ctrl_t ctrl, kbnode_t keyblock);
 static int menu_backsign(ctrl_t ctrl, kbnode_t pub_keyblock);
 static int menu_set_primary_uid(ctrl_t ctrl, kbnode_t pub_keyblock);
 static int menu_set_preferences(ctrl_t ctrl, kbnode_t pub_keyblock);
-static int menu_set_keyserver_url(ctrl_t ctrl, const char *url,
-                                  kbnode_t pub_keyblock);
 static int menu_set_notation(ctrl_t ctrl, const char *string,
                              kbnode_t pub_keyblock);
 static int menu_select_uid(KBNODE keyblock, int idx);
@@ -248,10 +246,6 @@ int keyedit_print_one_sig(ctrl_t ctrl, int rc, kbnode_t keyblock, kbnode_t node,
           sig, 3, -1,
           ((opt.list_options & LIST_SHOW_STD_NOTATIONS) ? 1 : 0) +
               ((opt.list_options & LIST_SHOW_USER_NOTATIONS) ? 2 : 0));
-
-    if (sig->flags.pref_ks &&
-        ((opt.list_options & LIST_SHOW_KEYSERVER_URLS) || extended))
-      show_keyserver_url(sig, 3, -1);
 
     if (extended) {
       PKT_public_key *pk = keyblock->pkt->pkt.public_key;
@@ -1078,7 +1072,6 @@ enum cmdids {
 #endif /*!NO_TRUST_MODELS*/
   cmdSHOWPREF,
   cmdSETPREF,
-  cmdPREFKS,
   cmdNOTATION,
   cmdINVCMD,
   cmdUPDTRUST,
@@ -1153,8 +1146,6 @@ static struct {
     {"setpref", cmdSETPREF, KEYEDIT_NOT_SK | KEYEDIT_NEED_SK,
      N_("set preference list for the selected user IDs")},
     {"updpref", cmdSETPREF, KEYEDIT_NOT_SK | KEYEDIT_NEED_SK, NULL},
-    {"keyserver", cmdPREFKS, KEYEDIT_NOT_SK | KEYEDIT_NEED_SK,
-     N_("set the preferred keyserver URL for the selected user IDs")},
     {"notation", cmdNOTATION, KEYEDIT_NOT_SK | KEYEDIT_NEED_SK,
      N_("set a notation for the selected user IDs")},
     {"passwd", cmdPASSWD, KEYEDIT_NOT_SK | KEYEDIT_NEED_SK,
@@ -1803,15 +1794,6 @@ void keyedit_menu(
           }
         }
       } break;
-
-      case cmdPREFKS:
-        if (menu_set_keyserver_url(ctrl, *arg_string ? arg_string : NULL,
-                                   keyblock)) {
-          merge_keys_and_selfsig(ctrl, keyblock);
-          modified = 1;
-          redisplay = 1;
-        }
-        break;
 
       case cmdNOTATION:
         if (menu_set_notation(ctrl, *arg_string ? arg_string : NULL,
@@ -2607,18 +2589,6 @@ static void show_prefs(PKT_user_id *uid, PKT_signature *selfsig, int verbose) {
     tty_printf("\n");
 
     if (selfsig) {
-      const byte *pref_ks;
-      size_t pref_ks_len;
-
-      pref_ks =
-          parse_sig_subpkt(selfsig->hashed, SIGSUBPKT_PREF_KS, &pref_ks_len);
-      if (pref_ks && pref_ks_len) {
-        tty_printf("     ");
-        tty_printf(_("Preferred keyserver: "));
-        tty_print_utf8_string(pref_ks, pref_ks_len);
-        tty_printf("\n");
-      }
-
       if (selfsig->flags.notation) {
         tty_printf("     ");
         tty_printf(_("Notations: "));
@@ -4062,121 +4032,6 @@ static int menu_set_preferences(ctrl_t ctrl, kbnode_t pub_keyblock) {
     }
   }
 
-  return modified;
-}
-
-static int menu_set_keyserver_url(ctrl_t ctrl, const char *url,
-                                  kbnode_t pub_keyblock) {
-  PKT_public_key *main_pk;
-  PKT_user_id *uid;
-  KBNODE node;
-  u32 keyid[2];
-  int selected, select_all;
-  int modified = 0;
-  char *answer, *uri;
-
-  no_primary_warning(pub_keyblock);
-
-  if (url)
-    answer = xstrdup(url);
-  else {
-    answer = cpr_get_utf8("keyedit.add_keyserver",
-                          _("Enter your preferred keyserver URL: "));
-    if (answer[0] == '\0' || answer[0] == CONTROL_D) {
-      xfree(answer);
-      return 0;
-    }
-  }
-
-  if (ascii_strcasecmp(answer, "none") == 0)
-    uri = NULL;
-  else {
-    struct keyserver_spec *keyserver = NULL;
-    /* Sanity check the format */
-    keyserver = parse_keyserver_uri(answer, 1);
-    xfree(answer);
-    if (!keyserver) {
-      log_info(_("could not parse keyserver URL\n"));
-      return 0;
-    }
-    uri = xstrdup(keyserver->uri);
-    free_keyserver_spec(keyserver);
-  }
-
-  select_all = !count_selected_uids(pub_keyblock);
-
-  /* Now we can actually change the self signature(s) */
-  main_pk = NULL;
-  uid = NULL;
-  selected = 0;
-  for (node = pub_keyblock; node; node = node->next) {
-    if (node->pkt->pkttype == PKT_PUBLIC_SUBKEY) break; /* ready */
-
-    if (node->pkt->pkttype == PKT_PUBLIC_KEY) {
-      main_pk = node->pkt->pkt.public_key;
-      keyid_from_pk(main_pk, keyid);
-    } else if (node->pkt->pkttype == PKT_USER_ID) {
-      uid = node->pkt->pkt.user_id;
-      selected = select_all || (node->flag & NODFLG_SELUID);
-    } else if (main_pk && uid && selected &&
-               node->pkt->pkttype == PKT_SIGNATURE) {
-      PKT_signature *sig = node->pkt->pkt.signature;
-      if (keyid[0] == sig->keyid[0] && keyid[1] == sig->keyid[1] &&
-          (uid && (sig->sig_class & ~3) == 0x10) && sig->flags.chosen_selfsig) {
-        std::string user = utf8_to_native(uid->name, strlen(uid->name), 0);
-        if (sig->version < 4)
-          log_info(_("skipping v3 self-signature on user ID \"%s\"\n"),
-                   user.c_str());
-        else {
-          /* This is a selfsignature which is to be replaced
-           * We have to ignore v3 signatures because they are
-           * not able to carry the subpacket. */
-          PKT_signature *newsig;
-          PACKET *newpkt;
-          int rc;
-          const byte *p;
-          size_t plen;
-
-          p = parse_sig_subpkt(sig->hashed, SIGSUBPKT_PREF_KS, &plen);
-          if (p && plen) {
-            tty_printf(
-                "Current preferred keyserver for user"
-                " ID \"%s\": ",
-                user.c_str());
-            tty_print_utf8_string(p, plen);
-            tty_printf("\n");
-            if (!cpr_get_answer_is_yes(
-                    "keyedit.confirm_keyserver",
-                    uri ? _("Are you sure you want to replace it? (y/N) ")
-                        : _("Are you sure you want to delete it? (y/N) ")))
-              continue;
-          } else if (uri == NULL) {
-            /* There is no current keyserver URL, so there
-               is no point in trying to un-set it. */
-            continue;
-          }
-
-          rc = update_keysig_packet(ctrl, &newsig, sig, main_pk, uid, NULL,
-                                    main_pk, keygen_add_keyserver_url, uri);
-          if (rc) {
-            log_error("update_keysig_packet failed: %s\n", gpg_strerror(rc));
-            xfree(uri);
-            return 0;
-          }
-          /* replace the packet */
-          newpkt = (PACKET *)xmalloc_clear(sizeof *newpkt);
-          newpkt->pkttype = PKT_SIGNATURE;
-          newpkt->pkt.signature = newsig;
-          free_packet(node->pkt, NULL);
-          xfree(node->pkt);
-          node->pkt = newpkt;
-          modified = 1;
-        }
-      }
-    }
-  }
-
-  xfree(uri);
   return modified;
 }
 

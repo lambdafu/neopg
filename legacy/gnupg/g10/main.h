@@ -431,7 +431,6 @@ void list_keyblock_direct(ctrl_t ctrl, kbnode_t keyblock, int secret,
 void print_fingerprint(ctrl_t ctrl, estream_t fp, PKT_public_key *pk, int mode);
 void print_revokers(estream_t fp, PKT_public_key *pk);
 void show_policy_url(PKT_signature *sig, int indent, int mode);
-void show_keyserver_url(PKT_signature *sig, int indent, int mode);
 void show_notation(PKT_signature *sig, int indent, int mode, int which);
 void dump_attribs(const PKT_user_id *uid, PKT_public_key *pk);
 void set_attrib_fd(int fd);

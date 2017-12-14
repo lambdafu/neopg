@@ -132,22 +132,6 @@ static gpg_error_t create_context(ctrl_t ctrl, assuan_context_t *r_ctx) {
   }
 
   if (err)
-    ;
-  else if ((opt.keyserver_options.options & KEYSERVER_HONOR_KEYSERVER_URL)) {
-    /* Tell the dirmngr that this possibly privacy invading
-       option is in use.  If Dirmngr is running in Tor mode, it
-       will return an error.  */
-    err = assuan_transact(ctx, "OPTION honor-keyserver-url-used", NULL, NULL,
-                          NULL, NULL, NULL, NULL);
-    if (err == GPG_ERR_FORBIDDEN)
-      log_error(
-          _("keyserver option \"honor-keyserver-url\""
-            " may not be used in Tor mode\n"));
-    else if (err == GPG_ERR_UNKNOWN_OPTION)
-      err = 0; /* Old dirmngr versions do not support this option.  */
-  }
-
-  if (err)
     assuan_release(ctx);
   else {
     *r_ctx = ctx;

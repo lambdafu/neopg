@@ -120,28 +120,6 @@ static void mk_notation_policy_etc(PKT_signature *sig, PKT_public_key *pk,
     }
   }
 
-  /* Preferred keyserver URL. */
-  if (IS_SIG(sig)) {
-    for (auto &&pu_ : opt.sig_keyserver_url) {
-      string = pu_.first.c_str();
-      unsigned int flags = pu_.second;
-
-      p = pct_expando(string, &args);
-      if (!p) {
-        log_error(
-            _("WARNING: unable to %%-expand preferred keyserver URL"
-              " (too large).  Using unexpanded.\n"));
-        p = xstrdup(string);
-      }
-
-      build_sig_subpkt(
-          sig, (sigsubpkttype_t)((SIGSUBPKT_PREF_KS |
-                                  ((flags & 1) ? SIGSUBPKT_FLAG_CRITICAL : 0))),
-          (const byte *)(p), strlen(p));
-      xfree(p);
-    }
-  }
-
   /* Set signer's user id.  */
   if (IS_SIG(sig) && !opt.flags.disable_signer_uid) {
     char *mbox;

@@ -93,8 +93,6 @@ static struct parse_options keyserver_opts[] = {
     {"refresh-add-fake-v3-keyids", KEYSERVER_ADD_FAKE_V3, NULL, NULL},
     {"auto-key-retrieve", KEYSERVER_AUTO_KEY_RETRIEVE, NULL,
      N_("automatically retrieve keys when verifying signatures")},
-    {"honor-keyserver-url", KEYSERVER_HONOR_KEYSERVER_URL, NULL,
-     N_("honor the preferred keyserver URL set on the key")},
     {NULL, 0, NULL, NULL}};
 
 static gpg_error_t keyserver_get(ctrl_t ctrl, KEYDB_SEARCH_DESC *desc,
@@ -388,24 +386,6 @@ fail:
 
   xfree(duped_uri);
   return NULL;
-}
-
-struct keyserver_spec *parse_preferred_keyserver(PKT_signature *sig) {
-  struct keyserver_spec *spec = NULL;
-  const byte *p;
-  size_t plen;
-
-  p = parse_sig_subpkt(sig->hashed, SIGSUBPKT_PREF_KS, &plen);
-  if (p && plen) {
-    byte *dupe = (byte *)xmalloc(plen + 1);
-
-    memcpy(dupe, p, plen);
-    dupe[plen] = '\0';
-    spec = parse_keyserver_uri((const char *)(dupe), 1);
-    xfree(dupe);
-  }
-
-  return spec;
 }
 
 static void print_keyrec(ctrl_t ctrl, int number, struct keyrec *keyrec) {
@@ -1106,38 +1086,6 @@ static int keyidlist(ctrl_t ctrl, const std::vector<std::string> &users,
                             &dummy);
       }
 
-      /* This is a little hackish, using the skipfncvalue as a
-         void* pointer to the keyserver spec, but we don't need
-         the skipfnc here, and it saves having an additional field
-         for this (which would be wasted space most of the
-         time). */
-
-      (*klist)[*count].skipfncvalue = NULL;
-
-      /* Are we honoring preferred keyservers? */
-      if (opt.keyserver_options.options & KEYSERVER_HONOR_KEYSERVER_URL) {
-        PKT_user_id *uid = NULL;
-        PKT_signature *sig = NULL;
-
-        merge_keys_and_selfsig(ctrl, keyblock);
-
-        for (node = node->next; node; node = node->next) {
-          if (node->pkt->pkttype == PKT_USER_ID &&
-              node->pkt->pkt.user_id->flags.primary)
-            uid = node->pkt->pkt.user_id;
-          else if (node->pkt->pkttype == PKT_SIGNATURE &&
-                   node->pkt->pkt.signature->flags.chosen_selfsig && uid) {
-            sig = node->pkt->pkt.signature;
-            break;
-          }
-        }
-
-        /* Try and parse the keyserver URL.  If it doesn't work,
-           then we end up writing NULL which indicates we are
-           the same as any other key. */
-        if (sig) (*klist)[*count].skipfncvalue = parse_preferred_keyserver(sig);
-      }
-
       (*count)++;
 
       if (*count == num) {
@@ -1199,40 +1147,6 @@ gpg_error_t keyserver_refresh(ctrl_t ctrl,
   if (err) return err;
 
   count = numdesc;
-  if (count > 0) {
-    int i;
-
-    /* Try to handle preferred keyserver keys first */
-    for (i = 0; i < numdesc; i++) {
-      if (desc[i].skipfncvalue) {
-        struct keyserver_spec *keyserver =
-            (keyserver_spec *)desc[i].skipfncvalue;
-
-        if (!opt.quiet)
-          log_info(_("refreshing %d key from %s\n"), 1, keyserver->uri);
-
-        /* We use the keyserver structure we parsed out before.
-           Note that a preferred keyserver without a scheme://
-           will be interpreted as hkp:// */
-        err = keyserver_get(ctrl, &desc[i], 1, keyserver, 0, NULL, NULL);
-        if (err)
-          log_info(_("WARNING: unable to refresh key %s"
-                     " via %s: %s\n"),
-                   keystr_from_desc(&desc[i]), keyserver->uri,
-                   gpg_strerror(err));
-        else {
-          /* We got it, so mark it as NONE so we don't try and
-             get it again from the regular keyserver. */
-
-          desc[i].mode = KEYDB_SEARCH_MODE_NONE;
-          count--;
-        }
-
-        free_keyserver_spec(keyserver);
-      }
-    }
-  }
-
   if (count > 0) {
     char *tmpuri;
 

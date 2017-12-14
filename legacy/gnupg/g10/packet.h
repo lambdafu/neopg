@@ -187,7 +187,6 @@ typedef struct {
     unsigned revocable : 1;
     unsigned policy_url : 1; /* At least one policy URL is present */
     unsigned notation : 1;   /* At least one notation is present */
-    unsigned pref_ks : 1;    /* At least one preferred keyserver is present */
     unsigned expired : 1;
   } flags;
   /* The key that allegedly generated this signature.  (Directly

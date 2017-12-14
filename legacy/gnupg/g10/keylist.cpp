@@ -285,42 +285,6 @@ void show_policy_url(PKT_signature *sig, int indent, int mode) {
   }
 }
 
-/* Print a keyserver URL.  Allowed values for MODE are:
- *  -1 - print to the TTY
- *   0 - print to stdout.
- *   1 - use log_info and emit status messages.
- *   2 - emit only status messages.
- */
-void show_keyserver_url(PKT_signature *sig, int indent, int mode) {
-  const byte *p;
-  size_t len;
-  int seq = 0, crit;
-  estream_t fp = mode < 0 ? NULL : mode ? log_get_stream() : es_stdout;
-
-  while ((
-      p = enum_sig_subpkt(sig->hashed, SIGSUBPKT_PREF_KS, &len, &seq, &crit))) {
-    if (mode != 2) {
-      const char *str;
-
-      tty_fprintf(fp, "%*s", indent, "");
-
-      if (crit)
-        str = _("Critical preferred keyserver: ");
-      else
-        str = _("Preferred keyserver: ");
-      if (mode > 0)
-        log_info("%s", str);
-      else
-        tty_fprintf(fp, "%s", str);
-      tty_print_utf8_string2(fp, p, len, 0);
-      tty_fprintf(fp, "\n");
-    }
-
-    if (mode > 0)
-      status_one_subpacket(SIGSUBPKT_PREF_KS, len, (crit ? 0x02 : 0) | 0x01, p);
-  }
-}
-
 /* Print notation data.  Allowed values for MODE are:
  *  -1 - print to the TTY
  *   0 - print to stdout.
@@ -920,9 +884,6 @@ static void list_keyblock_print(ctrl_t ctrl, kbnode_t keyblock, int secret,
             sig, 3, 0,
             ((opt.list_options & LIST_SHOW_STD_NOTATIONS) ? 1 : 0) +
                 ((opt.list_options & LIST_SHOW_USER_NOTATIONS) ? 2 : 0));
-
-      if (sig->flags.pref_ks && (opt.list_options & LIST_SHOW_KEYSERVER_URLS))
-        show_keyserver_url(sig, 3, 0);
 
       /* fixme: check or list other sigs here */
     }

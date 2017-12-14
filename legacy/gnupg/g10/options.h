@@ -157,7 +157,6 @@ extern int memory_stat_debug_mode;
 #define KEYSERVER_TIMEOUT (1 << 1)
 #define KEYSERVER_ADD_FAKE_V3 (1 << 2)
 #define KEYSERVER_AUTO_KEY_RETRIEVE (1 << 3)
-#define KEYSERVER_HONOR_KEYSERVER_URL (1 << 4)
 
 /* Global options for GPG.  */
 struct options {

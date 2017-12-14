@@ -21,6 +21,20 @@ level.
 
 4.3. Packet Tags
 
+5.2.3.18. Preferred Key Server
+
+* Preferred Key Server Packets MUST not be generatd.
+* Preferred Key Server Packets MUST be ignored.
+
+NOTE: Preferred key servers have not seen wide adoption, and they can
+be used to violate the privacy of the recipient.  The standard allows
+to set multiple preferred key servers on multiple user ids, which is
+ambiguous.  The meaning of the URI in the field is left open to
+interpretation.  Thus, existing preferred key servers in signature and
+in user id signatures must be ignored and new ones must not be
+generated.
+
+
 5.7. Symmetrically Encrypted Data Packet
 
 * Symmetrically Encrypted Data Packets MUST not be generated.

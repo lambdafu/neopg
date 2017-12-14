@@ -1261,10 +1261,6 @@ static void dump_sig_subpkt(int hashed, int type, int critical,
       for (i = 0; i < length; i++)
         *listfp << boost::format(" %02X") % buffer[i];
       break;
-    case SIGSUBPKT_PREF_KS:
-      *listfp << "preferred keyserver: ";
-      write_sanitized(*listfp, buffer, length);
-      break;
     case SIGSUBPKT_PRIMARY_UID:
       p = "primary user ID";
       break;
@@ -1707,9 +1703,6 @@ int parse_signature(IOBUF inp, int pkttype, unsigned long pktlen,
 
     p = parse_sig_subpkt(sig->hashed, SIGSUBPKT_POLICY, NULL);
     if (p) sig->flags.policy_url = 1;
-
-    p = parse_sig_subpkt(sig->hashed, SIGSUBPKT_PREF_KS, NULL);
-    if (p) sig->flags.pref_ks = 1;
 
     p = parse_sig_subpkt(sig->hashed, SIGSUBPKT_SIGNERS_UID, &len);
     if (p && len) {

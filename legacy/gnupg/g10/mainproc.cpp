@@ -1443,45 +1443,6 @@ static int check_sig_and_print(CTX c, kbnode_t node) {
 
   rc = do_check_sig(c, node, NULL, &is_expkey, &is_revkey, &pk);
 
-  /* If the key isn't found, check for a preferred keyserver.  */
-  if (rc == GPG_ERR_NO_PUBKEY && sig->flags.pref_ks) {
-    const byte *p;
-    int seq = 0;
-    size_t n;
-
-    while (
-        (p = enum_sig_subpkt(sig->hashed, SIGSUBPKT_PREF_KS, &n, &seq, NULL))) {
-      /* According to my favorite copy editor, in English grammar,
-         you say "at" if the key is located on a web page, but
-         "from" if it is located on a keyserver.  I'm not going to
-         even try to make two strings here :) */
-      log_info(_("Key available at: "));
-      print_utf8_buffer(log_get_stream(), p, n);
-      log_printf("\n");
-
-      if (opt.keyserver_options.options & KEYSERVER_AUTO_KEY_RETRIEVE &&
-          opt.keyserver_options.options & KEYSERVER_HONOR_KEYSERVER_URL) {
-        struct keyserver_spec *spec;
-
-        spec = parse_preferred_keyserver(sig);
-        if (spec) {
-          int res;
-
-          free_public_key(pk);
-          pk = NULL;
-          glo_ctrl.in_auto_key_retrieve++;
-          res = keyserver_import_keyid(c->ctrl, sig->keyid, spec, 1);
-          glo_ctrl.in_auto_key_retrieve--;
-          if (!res)
-            rc = do_check_sig(c, node, NULL, &is_expkey, &is_revkey, &pk);
-          free_keyserver_spec(spec);
-
-          if (!rc) break;
-        }
-      }
-    }
-  }
-
   /* If the above methods didn't work, our next try is to locate
    * the key via its fingerprint from a keyserver.  This requires
    * that the signers fingerprint is encoded in the signature.  */
@@ -1666,11 +1627,6 @@ static int check_sig_and_print(CTX c, kbnode_t node) {
         show_policy_url(sig, 0, 1);
       else
         show_policy_url(sig, 0, 2);
-
-      if ((opt.verify_options & VERIFY_SHOW_KEYSERVER_URLS))
-        show_keyserver_url(sig, 0, 1);
-      else
-        show_keyserver_url(sig, 0, 2);
 
       if ((opt.verify_options & VERIFY_SHOW_NOTATIONS))
         show_notation(

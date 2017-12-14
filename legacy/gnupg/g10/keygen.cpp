@@ -86,7 +86,6 @@ enum para_name {
   pSERIALNO,
   pCARDBACKUPKEY,
   pHANDLE,
-  pKEYSERVER,
   pKEYGRIP
 };
 
@@ -574,7 +573,6 @@ int keygen_upd_std_prefs(PKT_signature *sig, void *opaque) {
   /* Make sure that the MDC feature flag is set if needed.  */
   add_feature_mdc(sig, mdc_available);
   add_keyserver_modify(sig, ks_modify);
-  keygen_add_keyserver_url(sig, NULL);
 
   return 0;
 }
@@ -589,20 +587,6 @@ int keygen_add_std_prefs(PKT_signature *sig, void *opaque) {
   do_add_key_flags(sig, pk->pubkey_usage);
   keygen_add_key_expire(sig, opaque);
   keygen_upd_std_prefs(sig, opaque);
-  keygen_add_keyserver_url(sig, NULL);
-
-  return 0;
-}
-
-int keygen_add_keyserver_url(PKT_signature *sig, void *opaque) {
-  const char *url = (const char *)opaque;
-
-  if (!url && opt.def_keyserver_url) url = opt.def_keyserver_url->c_str();
-
-  if (url)
-    build_sig_subpkt(sig, SIGSUBPKT_PREF_KS, (const byte *)(url), strlen(url));
-  else
-    delete_sig_subpkt(sig->hashed, SIGSUBPKT_PREF_KS);
 
   return 0;
 }
@@ -2963,22 +2947,6 @@ static int proc_parameter_file(ctrl_t ctrl, struct para_data_s *para,
   /* Set preferences, if any. */
   keygen_set_std_prefs(get_parameter_value(para, pPREFERENCES), 0);
 
-  /* Set keyserver, if any. */
-  s1 = get_parameter_value(para, pKEYSERVER);
-  if (s1) {
-    struct keyserver_spec *spec;
-
-    spec = parse_keyserver_uri(s1, 1);
-    if (spec) {
-      free_keyserver_spec(spec);
-      opt.def_keyserver_url = s1;
-    } else {
-      r = get_parameter(para, pKEYSERVER);
-      log_error("%s:%d: invalid keyserver url\n", fname, r->lnr);
-      return -1;
-    }
-  }
-
   /* Set revoker, if any. */
   if (parse_revocation_key(fname, para, pREVOKER)) return -1;
 
@@ -3045,7 +3013,6 @@ static void read_parameter_file(ctrl_t ctrl, const char *fname) {
                   {"Preferences", (para_name)pPREFERENCES},
                   {"Revoker", (para_name)pREVOKER},
                   {"Handle", (para_name)pHANDLE},
-                  {"Keyserver", (para_name)pKEYSERVER},
                   {"Keygrip", (para_name)pKEYGRIP},
                   {NULL, (para_name)0}};
   IOBUF fp;
