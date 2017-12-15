@@ -18,6 +18,7 @@ namespace Proto {
 
 class Http {
   const long MAX_REDIRECTS_DEFAULT = 2;
+  const long MAX_FILESIZE_DEFAULT = 2 * 1024 * 1024;
 
  public:
   Http();
@@ -33,6 +34,7 @@ class Http {
   Http& no_cache(bool no_cache = true);
   Http& set_cainfo(const std::string& pemfile);
   Http& set_connect_to(const std::string& host);
+  Http& set_maxfilesize(long size);
 
   enum class Resolve : long {
     Any = CURL_IPRESOLVE_WHATEVER,
@@ -53,6 +55,7 @@ class Http {
   std::string m_last_error;
   boost::optional<std::string> m_post_data;
   std::string m_connect_to;
+  long m_maxfilesize;
 
   template <typename T>
   Http& set_opt(CURLoption opt, const T& val) {

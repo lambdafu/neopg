@@ -16,6 +16,7 @@ Http::Http() : m_handle(curl_easy_init(), curl_easy_cleanup) {
 
   set_opt_long(CURLOPT_NOSIGNAL, 1);
   set_redirects(MAX_REDIRECTS_DEFAULT);
+  set_maxfilesize(MAX_FILESIZE_DEFAULT);
 }
 
 Http& Http::forbid_reuse(bool no_reuse) {
@@ -104,12 +105,28 @@ Http& Http::set_connect_to(const std::string& connect_to) {
   return *this;
 }
 
+Http& Http::set_maxfilesize(long maxfilesize) {
+  /* CURLOPT_MAXFILESIZE only works if the server advertises the filesize in the
+     header.  We also implement a hard limit for unknown filesizes.  */
+  m_maxfilesize = maxfilesize;
+  return set_opt_long(CURLOPT_MAXFILESIZE, maxfilesize);
+}
+
 /* Must be an unbound function, because it is used as C callback.  */
 static size_t write_fnc(void* buffer, size_t size, size_t nmemb, void* userp) {
   std::string* response = (std::string*)userp;
   size_t amount = size * nmemb;  // Overflow?
   response->append((char*)buffer, amount);
   return amount;
+}
+
+static int progress_fnc(void* userp, curl_off_t dltotal, curl_off_t dlnow,
+                        curl_off_t ultotal, curl_off_t ulnow) {
+  long* maxfilesize = (long*)userp;
+  if (dlnow >
+      (curl_off_t)maxfilesize) /* Aborts with CURLE_ABORTED_BY_CALLBACK.  */
+    return 1;
+  return 0;
 }
 
 std::string Http::fetch() {
@@ -148,6 +165,11 @@ std::string Http::fetch() {
       connect_to.reset(ptr);
     set_opt_ptr(CURLOPT_CONNECT_TO, (void*)connect_to.get());
   }
+
+  /* Enforce maximum filesize.  */
+  set_opt_ptr(CURLOPT_XFERINFOFUNCTION, (void*)progress_fnc);
+  set_opt_ptr(CURLOPT_XFERINFODATA, (void*)&m_maxfilesize);
+  set_opt_long(CURLOPT_NOPROGRESS, 0);
 
   CURLcode result = curl_easy_perform(m_handle.get());
   if (result != CURLE_OK) throw std::runtime_error(last_error);
