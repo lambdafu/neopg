@@ -33,6 +33,7 @@
 
 #include <botan/hash.h>
 #include <botan/hex.h>
+#include <sstream>
 
 #include <assuan.h>
 #include "dirmngr.h"
@@ -81,21 +82,8 @@ struct server_local_s {
   /* If this flag is set to true this dirmngr process will be
      terminated after the end of this session.  */
   int stopme;
-
-  /* If the first both flags are set the assuan logging of data lines
-   * is suppressed.  The count variable is used to show the number of
-   * non-logged bytes.  */
-  size_t inhibit_data_logging_count;
-  unsigned int inhibit_data_logging : 1;
-  unsigned int inhibit_data_logging_now : 1;
 };
 
-/* Cookie definition for assuan data line output.  */
-static gpgrt_ssize_t data_line_cookie_write(void *cookie, const void *buffer,
-                                            size_t size);
-static int data_line_cookie_close(void *cookie);
-static es_cookie_io_functions_t data_line_cookie_functions = {
-    NULL, data_line_cookie_write, NULL, data_line_cookie_close};
 
 /* Release an uri_item_t list.  */
 static void release_uri_item_list(uri_item_t list) {
@@ -123,87 +111,6 @@ static gpg_error_t leave_cmd(assuan_context_t ctx, gpg_error_t err) {
     log_error("command '%s' failed: %s\n", name, gpg_strerror(err));
   }
   return err;
-}
-
-/* This is a wrapper around assuan_send_data which makes debugging the
-   output in verbose mode easier.  */
-static gpg_error_t data_line_write(assuan_context_t ctx, const void *buffer_arg,
-                                   size_t size) {
-  ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
-  const char *buffer = (const char *)buffer_arg;
-  gpg_error_t err;
-
-  /* If we do not want logging, enable it here.  */
-  if (ctrl && ctrl->server_local && ctrl->server_local->inhibit_data_logging)
-    ctrl->server_local->inhibit_data_logging_now = 1;
-
-  if (opt.verbose && buffer && size) {
-    /* Ease reading of output by sending a physical line at each LF.  */
-    const char *p;
-    size_t n, nbytes;
-
-    nbytes = size;
-    do {
-      p = (const char *)memchr(buffer, '\n', nbytes);
-      n = p ? (p - buffer) + 1 : nbytes;
-      err = assuan_send_data(ctx, buffer, n);
-      if (err) {
-        gpg_err_set_errno(EIO);
-        goto leave;
-      }
-      buffer += n;
-      nbytes -= n;
-      if (nbytes && (err = assuan_send_data(ctx, NULL, 0))) /* Flush line. */
-      {
-        gpg_err_set_errno(EIO);
-        goto leave;
-      }
-    } while (nbytes);
-  } else {
-    err = assuan_send_data(ctx, buffer, size);
-    if (err) {
-      gpg_err_set_errno(EIO); /* For use by data_line_cookie_write.  */
-      goto leave;
-    }
-  }
-
-leave:
-  if (ctrl && ctrl->server_local && ctrl->server_local->inhibit_data_logging) {
-    ctrl->server_local->inhibit_data_logging_now = 0;
-    ctrl->server_local->inhibit_data_logging_count += size;
-  }
-
-  return err;
-}
-
-/* A write handler used by es_fopencookie to write assuan data
-   lines.  */
-static gpgrt_ssize_t data_line_cookie_write(void *cookie, const void *buffer,
-                                            size_t size) {
-  assuan_context_t ctx = (assuan_context_t)cookie;
-
-  if (data_line_write(ctx, buffer, size)) return -1;
-  return (gpgrt_ssize_t)size;
-}
-
-static int data_line_cookie_close(void *cookie) {
-  assuan_context_t ctx = (assuan_context_t)cookie;
-
-  if (DBG_IPC) {
-    ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
-
-    if (ctrl && ctrl->server_local &&
-        ctrl->server_local->inhibit_data_logging &&
-        ctrl->server_local->inhibit_data_logging_count)
-      log_debug("(%zu bytes sent via D lines not shown)\n",
-                ctrl->server_local->inhibit_data_logging_count);
-  }
-  if (assuan_send_data(ctx, NULL, 0)) {
-    gpg_err_set_errno(EIO);
-    return -1;
-  }
-
-  return 0;
 }
 
 /* Copy the % and + escaped string S into the buffer D and replace the
@@ -923,17 +830,18 @@ static const char hlp_listcrls[] =
     "--list-crls\".";
 static gpg_error_t cmd_listcrls(assuan_context_t ctx, char *line) {
   gpg_error_t err;
-  estream_t fp;
+  std::stringstream list;
 
   (void)line;
 
-  fp = es_fopencookie(ctx, "w", data_line_cookie_functions);
-  if (!fp)
-    err = set_error(GPG_ERR_ASS_GENERAL, "error setting up a data stream");
-  else {
-    err = crl_cache_list(fp);
-    es_fclose(fp);
-  }
+  err = crl_cache_list(list);
+  if (err) leave_cmd(ctx, err);
+  std::string output = list.str();
+
+  err = assuan_send_data(ctx, output.data(), output.size());
+  if (!err)
+    err = assuan_send_data(ctx, NULL, 0);
+
   return leave_cmd(ctx, err);
 }
 
@@ -1212,7 +1120,6 @@ static gpg_error_t cmd_ks_search(assuan_context_t ctx, char *line) {
   ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
   gpg_error_t err;
   char *p;
-  estream_t outfp;
   std::vector<std::string> list;
 
   if (has_option(line, "--quick")) ctrl->timeout = opt.connect_quick_timeout;
@@ -1227,7 +1134,7 @@ static gpg_error_t cmd_ks_search(assuan_context_t ctx, char *line) {
       char *str = (char *)xtrymalloc(strlen(line));
       if (!str) {
         err = gpg_error_from_syserror();
-        goto leave;
+        return leave_cmd(ctx, err);
       }
       strcpy_escaped_plus(str, (const unsigned char *)(line));
       list.emplace_back(str);
@@ -1235,18 +1142,15 @@ static gpg_error_t cmd_ks_search(assuan_context_t ctx, char *line) {
   }
 
   err = ensure_keyserver(ctrl);
-  if (err) goto leave;
+  if (err) return leave_cmd(ctx, err);
 
-  /* Setup an output stream and perform the search.  */
-  outfp = es_fopencookie(ctx, "w", data_line_cookie_functions);
-  if (!outfp)
-    err = set_error(GPG_ERR_ASS_GENERAL, "error setting up a data stream");
-  else {
-    err = ks_action_search(ctrl, ctrl->server_local->keyservers, list, outfp);
-    es_fclose(outfp);
-  }
+  std::string output;
+  err = ks_action_search(ctrl, ctrl->server_local->keyservers, list, output);
 
-leave:
+  err = assuan_send_data(ctx, output.data(), output.size());
+  if (!err)
+    err = assuan_send_data(ctx, NULL, 0);
+
   return leave_cmd(ctx, err);
 }
 
@@ -1261,7 +1165,7 @@ static gpg_error_t cmd_ks_get(assuan_context_t ctx, char *line) {
   gpg_error_t err;
   std::vector<std::string> list;
   char *p;
-  estream_t outfp;
+  std::string output;
 
   if (has_option(line, "--quick")) ctrl->timeout = opt.connect_quick_timeout;
   line = skip_options(line);
@@ -1277,7 +1181,7 @@ static gpg_error_t cmd_ks_get(assuan_context_t ctx, char *line) {
       char *sl = (char *)xtrymalloc(strlen(line));
       if (!sl) {
         err = gpg_error_from_syserror();
-        goto leave;
+        return leave_cmd(ctx, err);
       }
       strcpy_escaped_plus(sl, (const unsigned char *)(line));
       list.emplace_back(sl);
@@ -1285,22 +1189,15 @@ static gpg_error_t cmd_ks_get(assuan_context_t ctx, char *line) {
   }
 
   err = ensure_keyserver(ctrl);
-  if (err) goto leave;
+  if (err) leave_cmd(ctx, err);
 
-  /* Setup an output stream and perform the get.  */
-  outfp = es_fopencookie(ctx, "w", data_line_cookie_functions);
-  if (!outfp)
-    err = set_error(GPG_ERR_ASS_GENERAL, "error setting up a data stream");
-  else {
-    ctrl->server_local->inhibit_data_logging = 1;
-    ctrl->server_local->inhibit_data_logging_now = 0;
-    ctrl->server_local->inhibit_data_logging_count = 0;
-    err = ks_action_get(ctrl, ctrl->server_local->keyservers, list, outfp);
-    es_fclose(outfp);
-    ctrl->server_local->inhibit_data_logging = 0;
-  }
+  err = ks_action_get(ctrl, ctrl->server_local->keyservers, list, output);
+  if (err) return leave_cmd(ctx, err);
 
-leave:
+  err = assuan_send_data(ctx, output.data(), output.size());
+  if (!err)
+    err = assuan_send_data(ctx, NULL, 0);
+
   return leave_cmd(ctx, err);
 }
 
@@ -1311,28 +1208,21 @@ static const char hlp_ks_fetch[] =
 static gpg_error_t cmd_ks_fetch(assuan_context_t ctx, char *line) {
   ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
   gpg_error_t err;
-  estream_t outfp;
 
   if (has_option(line, "--quick")) ctrl->timeout = opt.connect_quick_timeout;
   line = skip_options(line);
 
   err = ensure_keyserver(ctrl); /* FIXME: Why do we needs this here?  */
-  if (err) goto leave;
+  if (err) return leave_cmd(ctx, err);
 
   /* Setup an output stream and perform the get.  */
-  outfp = es_fopencookie(ctx, "w", data_line_cookie_functions);
-  if (!outfp)
-    err = set_error(GPG_ERR_ASS_GENERAL, "error setting up a data stream");
-  else {
-    ctrl->server_local->inhibit_data_logging = 1;
-    ctrl->server_local->inhibit_data_logging_now = 0;
-    ctrl->server_local->inhibit_data_logging_count = 0;
-    err = ks_action_fetch(ctrl, line, outfp);
-    es_fclose(outfp);
-    ctrl->server_local->inhibit_data_logging = 0;
-  }
+  std::string output;
+  err = ks_action_fetch(ctrl, line, output);
 
-leave:
+  err = assuan_send_data(ctx, output.data(), output.size());
+  if (!err)
+    err = assuan_send_data(ctx, NULL, 0);
+
   return leave_cmd(ctx, err);
 }
 
@@ -1451,27 +1341,6 @@ static int register_commands(assuan_context_t ctx) {
     if (rc) return rc;
   }
   return 0;
-}
-
-/* This function is called by our assuan log handler to test whether a
- * log message shall really be printed.  The function must return
- * false to inhibit the logging of MSG.  CAT gives the requested log
- * category.  MSG might be NULL. */
-int dirmngr_assuan_log_monitor(assuan_context_t ctx, unsigned int cat,
-                               const char *msg) {
-  ctrl_t ctrl = (ctrl_t)assuan_get_pointer(ctx);
-
-  (void)cat;
-  (void)msg;
-
-  if (!ctrl || !ctrl->server_local)
-    return 1; /* Can't decide - allow logging.  */
-
-  if (!ctrl->server_local->inhibit_data_logging)
-    return 1; /* Not requested - allow logging.  */
-
-  /* Disallow logging if *_now is true.  */
-  return !ctrl->server_local->inhibit_data_logging_now;
 }
 
 /* Startup the server and run the main command loop.  With FD = -1,

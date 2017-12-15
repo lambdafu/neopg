@@ -179,8 +179,6 @@ ksba_cert_t get_issuing_cert_local(ctrl_t ctrl, const char *issuer);
 ksba_cert_t get_cert_local_ski(ctrl_t ctrl, const char *name,
                                ksba_sexp_t keyid);
 gpg_error_t get_istrusted_from_client(ctrl_t ctrl, const char *hexfpr);
-int dirmngr_assuan_log_monitor(assuan_context_t ctx, unsigned int cat,
-                               const char *msg);
 void start_command_handler();
 gpg_error_t dirmngr_status(ctrl_t ctrl, const char *keyword, ...);
 gpg_error_t dirmngr_status_help(ctrl_t ctrl, const char *text);

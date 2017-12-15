@@ -80,12 +80,11 @@ gpg_error_t ks_action_help(ctrl_t ctrl, const char *url) {
    write the result to the provided output stream.  */
 gpg_error_t ks_action_search(ctrl_t ctrl, uri_item_t keyservers,
                              const std::vector<std::string> &patterns,
-                             estream_t outfp) {
+                             std::string &output) {
   gpg_error_t err = 0;
   int any_server = 0;
   int any_results = 0;
   uri_item_t uri;
-  std::string response;
 
   if (patterns.empty()) return GPG_ERR_NO_USER_ID;
 
@@ -102,8 +101,8 @@ gpg_error_t ks_action_search(ctrl_t ctrl, uri_item_t keyservers,
     if (is_http) {
       any_server = 1;
       {
-        err = ks_hkp_search(ctrl, uri->parsed_uri, patterns[0].c_str(),
-                            response, &http_status);
+        err = ks_hkp_search(ctrl, uri->parsed_uri, patterns[0].c_str(), output,
+                            &http_status);
       }
 
       if (err == GPG_ERR_NO_DATA && http_status == 404 /* not found */) {
@@ -113,8 +112,6 @@ gpg_error_t ks_action_search(ctrl_t ctrl, uri_item_t keyservers,
       }
 
       if (!err) {
-        if (es_write(outfp, response.data(), response.size(), NULL))
-          err = gpg_error_from_syserror();
         any_results = 1;
         break;
       }
@@ -132,13 +129,12 @@ gpg_error_t ks_action_search(ctrl_t ctrl, uri_item_t keyservers,
    keyservers and write the result to the provided output stream.  */
 gpg_error_t ks_action_get(ctrl_t ctrl, uri_item_t keyservers,
                           const std::vector<std::string> &patterns,
-                          estream_t outfp) {
+                          std::string &response) {
   gpg_error_t err = 0;
   gpg_error_t first_err = 0;
   int any_server = 0;
   int any_data = 0;
   uri_item_t uri;
-  std::string response;
 
   if (patterns.empty()) return GPG_ERR_NO_USER_ID;
 
@@ -154,10 +150,12 @@ gpg_error_t ks_action_get(ctrl_t ctrl, uri_item_t keyservers,
     printf("considering %s %i\n", uri->uri, is_http);
 
     if (is_http) {
+      std::string one_response;
       any_server = 1;
       for (auto &pattern : patterns) {
         {
-          err = ks_hkp_get(ctrl, uri->parsed_uri, pattern.c_str(), response);
+          err =
+              ks_hkp_get(ctrl, uri->parsed_uri, pattern.c_str(), one_response);
           if (err) break;
         }
 
@@ -170,7 +168,7 @@ gpg_error_t ks_action_get(ctrl_t ctrl, uri_item_t keyservers,
           first_err = err;
           err = 0;
         } else {
-          es_write(outfp, response.data(), response.size(), NULL);
+          response.append(one_response);
           any_data = 1;
         }
       }
@@ -187,9 +185,8 @@ gpg_error_t ks_action_get(ctrl_t ctrl, uri_item_t keyservers,
 
 /* Retrieve keys from URL and write the result to the provided output
    stream OUTFP.  */
-gpg_error_t ks_action_fetch(ctrl_t ctrl, const char *url, estream_t outfp) {
+gpg_error_t ks_action_fetch(ctrl_t ctrl, const char *url, std::string &output) {
   gpg_error_t err = 0;
-  std::string response;
   parsed_uri_t parsed_uri; /* The broken down URI.  */
 
   if (!url) return GPG_ERR_INV_URI;
@@ -198,10 +195,7 @@ gpg_error_t ks_action_fetch(ctrl_t ctrl, const char *url, estream_t outfp) {
   if (err) return err;
 
   if (parsed_uri->is_http) {
-    err = ks_http_fetch(ctrl, url, response);
-    if (!err) {
-      es_write(outfp, response.data(), response.size(), NULL);
-    }
+    err = ks_http_fetch(ctrl, url, output);
   } else
     err = GPG_ERR_INV_URI;
 

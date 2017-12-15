@@ -21,6 +21,8 @@
 
 #include <config.h>
 
+#include <iostream>
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -533,7 +535,7 @@ int dirmngr_main(int argc, char **argv) {
   assuan_set_malloc_hooks(&malloc_hooks);
   assuan_set_assuan_log_prefix(log_get_prefix(NULL));
   assuan_sock_init();
-  setup_libassuan_logging(&opt.debug, dirmngr_assuan_log_monitor);
+  setup_libassuan_logging(&opt.debug, NULL);
 
   setup_libgcrypt_logging();
 
@@ -748,7 +750,7 @@ next_pass:
     /* Just list the CRL cache and exit. */
     if (argc) wrong_args("--list-crls");
     crl_cache_init();
-    crl_cache_list(es_stdout);
+    crl_cache_list(std::cout);
   } else if (cmd == aLoadCRL) {
     struct server_control_s ctrlbuf;
 

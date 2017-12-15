@@ -27,11 +27,11 @@
 gpg_error_t ks_action_help(ctrl_t ctrl, const char *url);
 gpg_error_t ks_action_search(ctrl_t ctrl, uri_item_t keyservers,
                              const std::vector<std::string> &patterns,
-                             estream_t outfp);
+                             std::string &output);
 gpg_error_t ks_action_get(ctrl_t ctrl, uri_item_t keyservers,
                           const std::vector<std::string> &patterns,
-                          estream_t outfp);
-gpg_error_t ks_action_fetch(ctrl_t ctrl, const char *url, estream_t outfp);
+                          std::string &output);
+gpg_error_t ks_action_fetch(ctrl_t ctrl, const char *url, std::string &output);
 gpg_error_t ks_action_put(ctrl_t ctrl, uri_item_t keyservers, void *data,
                           size_t datalen, void *info, size_t infolen);
 

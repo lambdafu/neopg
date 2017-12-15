@@ -89,6 +89,9 @@
 
 #include <config.h>
 
+#include <boost/format.hpp>
+#include <ostream>
+
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -1914,52 +1917,54 @@ leave:
 /* Print one cached entry E in a human readable format to stream
    FP. Return 0 on success. */
 static gpg_error_t list_one_crl_entry(crl_cache_t cache, crl_cache_entry_t e,
-                                      estream_t fp) {
+                                      std::ostream &out) {
   struct cdb_find cdbfp;
   struct cdb *cdb;
   int rc;
   int warn = 0;
   const unsigned char *s;
 
-  es_fputs("--------------------------------------------------------\n", fp);
-  es_fprintf(fp, _("Begin CRL dump (retrieved via %s)\n"), e->url);
-  es_fprintf(fp, " Issuer:\t%s\n", e->issuer);
-  es_fprintf(fp, " Issuer Hash:\t%s\n", e->issuer_hash);
-  es_fprintf(fp, " This Update:\t%s\n", e->this_update);
-  es_fprintf(fp, " Next Update:\t%s\n", e->next_update);
-  es_fprintf(fp, " CRL Number :\t%s\n", e->crl_number ? e->crl_number : "none");
-  es_fprintf(fp, " AuthKeyId  :\t%s\n",
-             e->authority_serialno ? e->authority_serialno : "none");
+  out << "--------------------------------------------------------\n";
+  out << "Begin CRL dump (retrieved via " << e->url << "%)\n";
+  out << " Issuer:\t" << e->issuer << "\n";
+  out << " Issuer Hash:\t" << e->issuer_hash << "\n";
+  out << " This Update:\t" << e->this_update << "\n";
+  out << " Next Update:\t" << e->next_update << "\n";
+  out << " CRL Number :\t" << (e->crl_number ? e->crl_number : "none") << "\n";
+  out << " AuthKeyId  :\t"
+      << (e->authority_serialno ? e->authority_serialno : "none") << "\n";
   if (e->authority_serialno && e->authority_issuer) {
-    es_fputs("             \t", fp);
+    out << "             \t";
     for (s = (const unsigned char *)e->authority_issuer; *s; s++)
       if (*s == '\x01')
-        es_fputs("\n             \t", fp);
+        out << "\n             \t";
       else
-        es_putc(*s, fp);
-    es_putc('\n', fp);
+        out << (char)*s;
+    out << "\n";
   }
-  es_fprintf(fp, " Trust Check:\t%s\n",
-             !e->user_trust_req
-                 ? "[system]"
-                 : e->check_trust_anchor ? e->check_trust_anchor : "[missing]");
+  out << " Trust Check:\t"
+      << (!e->user_trust_req
+              ? "[system]"
+              : e->check_trust_anchor ? e->check_trust_anchor : "[missing]")
+      << "\n";
 
   if ((e->invalid & 1))
-    es_fprintf(fp, _(" ERROR: The CRL will not be used "
-                     "because it was still too old after an update!\n"));
+    out << _(
+        " ERROR: The CRL will not be used "
+        "because it was still too old after an update!\n");
   if ((e->invalid & 2))
-    es_fprintf(fp, _(" ERROR: The CRL will not be used "
-                     "due to an unknown critical extension!\n"));
-  if ((e->invalid & ~3))
-    es_fprintf(fp, _(" ERROR: The CRL will not be used\n"));
+    out << _(
+        " ERROR: The CRL will not be used "
+        "due to an unknown critical extension!\n");
+  if ((e->invalid & ~3)) out << _(" ERROR: The CRL will not be used\n");
 
   cdb = lock_db_file(cache, e);
   if (!cdb) return GPG_ERR_GENERAL;
 
   if (!e->dbfile_checked)
-    es_fprintf(fp, _(" ERROR: This cached CRL may have been tampered with!\n"));
+    out << _(" ERROR: This cached CRL may have been tampered with!\n");
 
-  es_putc('\n', fp);
+  out << "\n";
 
   rc = cdb_findinit(&cdbfp, cdb, NULL, 0);
   while (!rc && (rc = cdb_findnext(&cdbfp)) > 0) {
@@ -1993,46 +1998,44 @@ static gpg_error_t list_one_crl_entry(crl_cache_t cache, crl_cache_entry_t e,
     }
 
     reason = *record;
-    es_fputs("  ", fp);
-    for (i = 0; i < n; i++) es_fprintf(fp, "%02X", keyrecord[i]);
-    es_fputs(":\t reasons( ", fp);
+    out << " ";
+    for (i = 0; i < n; i++) out << boost::format("%02X") % (char)keyrecord[i];
+    out << ":\t reasons( ";
 
-    if (reason & KSBA_CRLREASON_UNSPECIFIED)
-      es_fputs("unspecified ", fp), any = 1;
+    if (reason & KSBA_CRLREASON_UNSPECIFIED) out << "unspecified ", any = 1;
     if (reason & KSBA_CRLREASON_KEY_COMPROMISE)
-      es_fputs("key_compromise ", fp), any = 1;
-    if (reason & KSBA_CRLREASON_CA_COMPROMISE)
-      es_fputs("ca_compromise ", fp), any = 1;
+      out << "key_compromise ", any = 1;
+    if (reason & KSBA_CRLREASON_CA_COMPROMISE) out << "ca_compromise ", any = 1;
     if (reason & KSBA_CRLREASON_AFFILIATION_CHANGED)
-      es_fputs("affiliation_changed ", fp), any = 1;
-    if (reason & KSBA_CRLREASON_SUPERSEDED) es_fputs("superseded", fp), any = 1;
+      out << "affiliation_changed ", any = 1;
+    if (reason & KSBA_CRLREASON_SUPERSEDED) out << "superseded", any = 1;
     if (reason & KSBA_CRLREASON_CESSATION_OF_OPERATION)
-      es_fputs("cessation_of_operation", fp), any = 1;
+      out << "cessation_of_operation", any = 1;
     if (reason & KSBA_CRLREASON_CERTIFICATE_HOLD)
-      es_fputs("certificate_hold", fp), any = 1;
-    if (reason && !any) es_fputs("other", fp);
+      out << "certificate_hold", any = 1;
+    if (reason && !any) out << "other";
 
-    es_fprintf(fp, ") rdate: %.15s\n", record + 1);
+    out << boost::format(") rdate: %.15s\n") % (record + 1);
   }
   if (rc) log_error(_("error reading cache entry from db: %s\n"), strerror(rc));
 
   unlock_db_file(cache, e);
-  es_fprintf(fp, _("End CRL dump\n"));
-  es_putc('\n', fp);
+  out << _("End CRL dump\n");
+  out << "\n";
 
   return (rc || warn) ? GPG_ERR_GENERAL : 0;
 }
 
 /* Print the contents of the CRL CACHE in a human readable format to
    stream FP. */
-gpg_error_t crl_cache_list(estream_t fp) {
+gpg_error_t crl_cache_list(std::ostream &out) {
   crl_cache_t cache = get_current_cache();
   crl_cache_entry_t entry;
   gpg_error_t err = 0;
 
   for (entry = cache->entries; entry && !entry->deleted && !err;
        entry = entry->next)
-    err = list_one_crl_entry(cache, entry, fp);
+    err = list_one_crl_entry(cache, entry, out);
 
   return err;
 }
