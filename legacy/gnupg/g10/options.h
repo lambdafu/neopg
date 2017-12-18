@@ -155,7 +155,6 @@ extern int memory_stat_debug_mode;
 
 #define KEYSERVER_HTTP_PROXY (1 << 0)
 #define KEYSERVER_TIMEOUT (1 << 1)
-#define KEYSERVER_ADD_FAKE_V3 (1 << 2)
 #define KEYSERVER_AUTO_KEY_RETRIEVE (1 << 3)
 
 /* Global options for GPG.  */

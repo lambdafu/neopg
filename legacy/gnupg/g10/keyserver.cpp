@@ -90,7 +90,6 @@ static struct parse_options keyserver_opts[] = {
      N_("include subkeys when searching by key ID")},
     {"timeout", KEYSERVER_TIMEOUT, NULL,
      N_("override timeout options set for dirmngr")},
-    {"refresh-add-fake-v3-keyids", KEYSERVER_ADD_FAKE_V3, NULL, NULL},
     {"auto-key-retrieve", KEYSERVER_AUTO_KEY_RETRIEVE, NULL,
      N_("automatically retrieve keys when verifying signatures")},
     {NULL, 0, NULL, NULL}};
@@ -839,7 +838,7 @@ int keyserver_import_keyid(ctrl_t ctrl, u32 *keyid,
 
 /* code mostly stolen from do_export_stream */
 static int keyidlist(ctrl_t ctrl, const std::vector<std::string> &users,
-                     KEYDB_SEARCH_DESC **klist, int *count, int fakev3) {
+                     KEYDB_SEARCH_DESC **klist, int *count) {
   int rc = 0;
   int num = 100;
   kbnode_t keyblock = NULL;
@@ -891,25 +890,6 @@ static int keyidlist(ctrl_t ctrl, const std::vector<std::string> &users,
     }
 
     if ((node = find_kbnode(keyblock, PKT_PUBLIC_KEY))) {
-      /* This is to work around a bug in some keyservers (pksd and
-         OKS) that calculate v4 RSA keyids as if they were v3 RSA.
-         The answer is to refresh both the correct v4 keyid
-         (e.g. 99242560) and the fake v3 keyid (e.g. 68FDDBC7).
-         This only happens for key refresh using the HKP scheme
-         and if the refresh-add-fake-v3-keyids keyserver option is
-         set. */
-      if (fakev3 && is_RSA(node->pkt->pkt.public_key->pubkey_algo) &&
-          node->pkt->pkt.public_key->version >= 4) {
-        (*klist)[*count].mode = KEYDB_SEARCH_MODE_LONG_KID;
-        v3_keyid(node->pkt->pkt.public_key->pkey[0], (*klist)[*count].u.kid);
-        (*count)++;
-
-        if (*count == num) {
-          num += 100;
-          *klist = (KEYDB_SEARCH_DESC *)xrealloc(
-              *klist, sizeof(KEYDB_SEARCH_DESC) * num);
-        }
-      }
 
       /* v4 keys get full fingerprints.  v3 keys get long keyids.
          This is because it's easy to calculate any sort of keyid
@@ -957,7 +937,6 @@ gpg_error_t keyserver_refresh(ctrl_t ctrl,
                               const std::vector<std::string> &users) {
   gpg_error_t err;
   int count, numdesc;
-  int fakev3 = 0;
   KEYDB_SEARCH_DESC *desc;
   unsigned int options = opt.keyserver_options.import_options;
 
@@ -971,20 +950,7 @@ gpg_error_t keyserver_refresh(ctrl_t ctrl,
      the end here. */
   opt.keyserver_options.import_options |= IMPORT_FAST;
 
-  /* If refresh_add_fake_v3_keyids is on and it's a HKP or MAILTO
-     scheme, then enable fake v3 keyid generation.  Note that this
-     works only with a keyserver configured. gpg.conf
-     (i.e. opt.keyserver); however that method of configuring a
-     keyserver is deprecated and in any case it is questionable
-     whether we should keep on supporting these ancient and broken
-     keyservers.  */
-  if ((opt.keyserver_options.options & KEYSERVER_ADD_FAKE_V3) &&
-      !opt.keyserver.empty() &&
-      (ascii_strcasecmp(opt.keyserver[0]->uri.scheme.c_str(), "hkp") == 0 ||
-       ascii_strcasecmp(opt.keyserver[0]->uri.scheme.c_str(), "mailto") == 0))
-    fakev3 = 1;
-
-  err = keyidlist(ctrl, users, &desc, &numdesc, fakev3);
+  err = keyidlist(ctrl, users, &desc, &numdesc);
   if (err) return err;
 
   count = numdesc;
