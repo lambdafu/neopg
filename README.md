@@ -155,6 +155,13 @@ For the dependencies use a package manager like [Homebrew](https://brew.sh):
 $ brew install botan boost cmake doxygen gettext
 ```
 
+By default homebrew does not link the gettext binaries into the path, to enforce
+this:
+
+```
+$ brew link gettext --force
+```
+
 Build it!
 
 ```
