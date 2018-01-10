@@ -1,6 +1,7 @@
 [![Gitter](https://badges.gitter.im/das-labor/neopg.svg)](https://gitter.im/das-labor/neopg)
 [![Build Status](https://travis-ci.org/das-labor/neopg.svg?branch=master)](https://travis-ci.org/das-labor/neopg)
 [![Code Coverage](https://codecov.io/gh/das-labor/neopg/branch/master/graph/badge.svg)](https://codecov.io/gh/das-labor/neopg)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fdas-labor%2Fneopg.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fdas-labor%2Fneopg?ref=badge_shield)
 
 # NeoPG implements the OpenPGP standard.
 
@@ -173,3 +174,7 @@ $ make
 ```
 
 Have fun!
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fdas-labor%2Fneopg.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fdas-labor%2Fneopg?ref=badge_large)
