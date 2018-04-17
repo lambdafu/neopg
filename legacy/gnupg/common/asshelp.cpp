@@ -214,7 +214,7 @@ gpg_error_t start_new_gpg_agent(assuan_context_t *r_ctx,
     char *abs_homedir;
     int i;
 
-    if (verbose) log_info(_("starting agent'%s'\n"), neopg_program);
+    if (verbose) log_info(_("starting agent '%s'\n"), neopg_program);
 
     /* We better pass an absolute home directory to the agent just in
      case gpg-agent does not convert the passed name to an absolute
