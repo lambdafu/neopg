@@ -58,9 +58,6 @@
 #define USE_ELGAMAL 1
 
 /* Defined if this module should be included */
-#define USE_IDEA 1
-
-/* Defined if this module should be included */
 #define USE_MD4 1
 
 /* Defined if this module should be included */
@@ -239,7 +236,6 @@
 #define GPG_USE_CAST5 1
 #define GPG_USE_ECDH 1
 #define GPG_USE_EDDSA 1
-#define GPG_USE_IDEA 1
 #define GPG_USE_MD5 1
 #define GPG_USE_RMD160 1
 #define GPG_USE_RSA 1

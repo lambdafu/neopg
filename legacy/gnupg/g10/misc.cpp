@@ -336,7 +336,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_IDEA;
 #else
     case CIPHER_ALGO_IDEA:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
     case CIPHER_ALGO_3DES:
@@ -347,7 +347,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_CAST5;
 #else
     case CIPHER_ALGO_CAST5:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_BLOWFISH
@@ -355,7 +355,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_BLOWFISH;
 #else
     case CIPHER_ALGO_BLOWFISH:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_AES128
@@ -363,7 +363,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_AES;
 #else
     case CIPHER_ALGO_AES:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_AES192
@@ -371,7 +371,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_AES192;
 #else
     case CIPHER_ALGO_AES192:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_AES256
@@ -379,7 +379,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_AES256;
 #else
     case CIPHER_ALGO_AES256:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_TWOFISH
@@ -387,7 +387,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_TWOFISH;
 #else
     case CIPHER_ALGO_TWOFISH:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_CAMELLIA128
@@ -395,7 +395,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_CAMELLIA128;
 #else
     case CIPHER_ALGO_CAMELLIA128:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_CAMELLIA192
@@ -403,7 +403,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_CAMELLIA192;
 #else
     case CIPHER_ALGO_CAMELLIA192:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
 
 #ifdef GPG_USE_CAMELLIA256
@@ -411,7 +411,7 @@ enum gcry_cipher_algos map_cipher_openpgp_to_gcry(cipher_algo_t algo) {
       return GCRY_CIPHER_CAMELLIA256;
 #else
     case CIPHER_ALGO_CAMELLIA256:
-      return 0;
+      return (gcry_cipher_algos)0;
 #endif
     default:
       return (gcry_cipher_algos)0;
