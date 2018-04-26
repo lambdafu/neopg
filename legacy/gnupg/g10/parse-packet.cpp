@@ -26,9 +26,6 @@
 #include <boost/format.hpp>
 #include <iostream>
 
-#include <json.hpp>
-using json = nlohmann::json;
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,9 +93,7 @@ static int parse_gpg_control(IOBUF inp, int pkttype, unsigned long pktlen,
  * (which were not really C string literals).  */
 static void write_sanitized(std::ostream &fp, const byte *buffer,
                             int buffer_len) {
-  std::string str((const char *)buffer, buffer_len);
-  json j = str;
-  fp << j;
+  fp.write(reinterpret_cast<const char*>(buffer), buffer_len);
 }
 
 /* Read a 16-bit value in MSB order (big endian) from an iobuf.  */

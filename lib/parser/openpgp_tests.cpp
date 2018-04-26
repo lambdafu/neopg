@@ -7,20 +7,15 @@
 
 #include <neopg/intern/cplusplus.h>
 
-#include <json.hpp>
-
 #include <sstream>
 
 #include "gtest/gtest.h"
 
 using namespace NeoPG;
 
-using json = nlohmann::json;
-
 namespace NeoPG {
 std::ostream& operator<<(std::ostream& os, const RawPacket& packet) {
-  json content = packet.content();
-  os << "RawPacket(type=" << (int)packet.type() << ", content=" << content
+  os << "RawPacket(type=" << (int)packet.type() << ", content=" << packet.content()
      << ")";
   return os;
 }
