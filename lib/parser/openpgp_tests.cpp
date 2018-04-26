@@ -7,6 +7,8 @@
 
 #include <neopg/intern/cplusplus.h>
 
+#include <tao/json.hpp>
+
 #include <sstream>
 
 #include "gtest/gtest.h"
@@ -15,7 +17,8 @@ using namespace NeoPG;
 
 namespace NeoPG {
 std::ostream& operator<<(std::ostream& os, const RawPacket& packet) {
-  os << "RawPacket(type=" << (int)packet.type() << ", content=" << packet.content()
+  const tao::json::value content = packet.content();
+  os << "RawPacket(type=" << (int)packet.type() << ", content=" << content
      << ")";
   return os;
 }

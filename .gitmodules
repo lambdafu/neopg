@@ -7,3 +7,6 @@
 [submodule "3rdparty/rang"]
 	path = 3rdparty/rang
 	url = https://github.com/agauniyal/rang.git
+[submodule "3rdparty/json"]
+	path = 3rdparty/json
+	url = https://github.com/taocpp/json.git

@@ -26,6 +26,8 @@
 #include <boost/format.hpp>
 #include <iostream>
 
+#include <tao/json/events/to_stream.hpp>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,7 +95,8 @@ static int parse_gpg_control(IOBUF inp, int pkttype, unsigned long pktlen,
  * (which were not really C string literals).  */
 static void write_sanitized(std::ostream &fp, const byte *buffer,
                             int buffer_len) {
-  fp.write(reinterpret_cast<const char*>(buffer), buffer_len);
+  tao::json::events::to_stream to(fp);
+  to.string(tao::string_view(reinterpret_cast<const char*>(buffer), static_cast<std::size_t>(buffer_len)));
 }
 
 /* Read a 16-bit value in MSB order (big endian) from an iobuf.  */
