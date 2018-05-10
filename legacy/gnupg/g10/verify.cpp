@@ -153,7 +153,7 @@ static int verify_one_file(ctrl_t ctrl, const char *name) {
     }
   }
 
-  rc = proc_signature_packets(ctrl, NULL, fp, boost::none, name);
+  rc = proc_signature_packets(ctrl, NULL, fp, tao::nullopt, name);
   iobuf_close(fp);
   write_status(STATUS_FILE_DONE);
 

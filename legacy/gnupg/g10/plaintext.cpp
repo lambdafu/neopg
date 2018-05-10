@@ -480,7 +480,7 @@ leave:
 /* Hash the given files and append the hash to hash contexts MD and
  * MD2.  If FILES is NULL, stdin is hashed.  */
 int hash_datafiles(gcry_md_hd_t md, gcry_md_hd_t md2,
-                   const boost::optional<std::vector<std::string>> &files,
+                   const tao::optional<std::vector<std::string>> &files,
                    const char *sigfilename, int textmode) {
   progress_filter_context_t *pfx;
   IOBUF fp;

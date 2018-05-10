@@ -58,7 +58,7 @@ Http& Http::set_timeout(long milliseconds) {
   return set_opt_long(CURLOPT_TIMEOUT_MS, milliseconds);
 }
 
-Http& Http::set_post(const boost::optional<std::string>& data) {
+Http& Http::set_post(const tao::optional<std::string>& data) {
   m_post_data = data;
   if (m_post_data) {
     set_opt_ptr(CURLOPT_POSTFIELDS, (void*)m_post_data->data());
@@ -73,7 +73,7 @@ Http& Http::set_post(const boost::optional<std::string>& data) {
 
 Http& Http::set_post(const char* data, size_t len) {
   if (data == nullptr || len == 0)
-    set_post(boost::none);
+    set_post(tao::nullopt);
   else
     set_post(std::string(data, len));
   return *this;

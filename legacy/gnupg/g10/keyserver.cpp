@@ -152,7 +152,7 @@ int parse_keyserver_options(char *options) {
     }
   }
 
-  opt.keyserver_options.http_proxy = http_proxy;
+  opt.keyserver_options.http_proxy.emplace(http_proxy);
 
   if (max_cert) {
     max_cert_size = strtoul(max_cert, (char **)NULL, 10);

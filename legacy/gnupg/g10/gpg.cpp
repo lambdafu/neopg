@@ -1719,7 +1719,7 @@ next_pass:
         break;
 
       case oOutput:
-        opt.outfile = pargs.r.ret_str;
+        opt.outfile.emplace(pargs.r.ret_str);
         break;
 
       case oMaxOutput:
@@ -1887,11 +1887,11 @@ next_pass:
           opt.def_recipient = str_to_utf8(pargs.r.ret_str, utf8_strings);
         break;
       case oDefRecipientSelf:
-        opt.def_recipient = boost::none;
+        opt.def_recipient = tao::nullopt;
         opt.def_recipient_self = 1;
         break;
       case oNoDefRecipient:
-        opt.def_recipient = boost::none;
+        opt.def_recipient = tao::nullopt;
         opt.def_recipient_self = 0;
         break;
       case oHomedir:
@@ -2085,7 +2085,7 @@ next_pass:
             log_error(_("'%s' is not a valid signature expiration\n"),
                       pargs.r.ret_str);
           else
-            opt.def_sig_expire = pargs.r.ret_str;
+            opt.def_sig_expire.emplace(pargs.r.ret_str);
         }
         break;
 
@@ -2103,7 +2103,7 @@ next_pass:
             log_error(_("'%s' is not a valid signature expiration\n"),
                       pargs.r.ret_str);
           else
-            opt.def_cert_expire = pargs.r.ret_str;
+            opt.def_cert_expire.emplace(pargs.r.ret_str);
         }
         break;
 
@@ -2376,7 +2376,7 @@ next_pass:
         break;
 
       case oDefaultPreferenceList:
-        opt.def_preference_list = pargs.r.ret_str;
+        opt.def_preference_list.emplace(pargs.r.ret_str);
         break;
       case oDefaultKeyserverURL: {
         keyserver_spec_t keyserver;
@@ -2386,7 +2386,7 @@ next_pass:
         else
           delete keyserver;
 
-        opt.def_keyserver_url = pargs.r.ret_str;
+        opt.def_keyserver_url.emplace(pargs.r.ret_str);
       } break;
       case oPersonalCipherPreferences:
         pers_cipher_list = pargs.r.ret_str;
@@ -2410,10 +2410,10 @@ next_pass:
         break;
 
       case oLCctype:
-        opt.lc_ctype = pargs.r.ret_str;
+        opt.lc_ctype.emplace(pargs.r.ret_str);
         break;
       case oLCmessages:
-        opt.lc_messages = pargs.r.ret_str;
+        opt.lc_messages.emplace(pargs.r.ret_str);
         break;
 
       case oGroup:
@@ -2522,7 +2522,7 @@ next_pass:
       } break;
 
       case oDefaultNewKeyAlgo:
-        opt.def_new_key_algo = pargs.r.ret_str;
+        opt.def_new_key_algo.emplace(pargs.r.ret_str);
         break;
 
       case oNoop:

@@ -55,6 +55,7 @@ target_include_directories(neopg PUBLIC
   "${CMAKE_BINARY_DIR}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}/include"
   ${PEGTL_INCLUDE_DIR}
+  ${JSON_INCLUDE_DIR}
   ${Boost_INCLUDE_DIR}
   ${BOTAN2_INCLUDE_DIRS}
   ${CURL_INCLUDE_DIRS}

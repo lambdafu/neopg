@@ -7,7 +7,7 @@
 #pragma once
 
 #include <curl/curl.h>
-#include <boost/optional.hpp>
+#include <tao/json/external/optional.hpp>
 #include <map>
 #include <regex>
 
@@ -28,7 +28,7 @@ class NEOPG_UNSTABLE_API Http {
   Http& default_proxy(bool allow_default = true);
   Http& set_redirects(long nr);
   Http& set_timeout(long milliseconds);
-  Http& set_post(const boost::optional<std::string>& data = boost::none);
+  Http& set_post(const tao::optional<std::string>& data = tao::nullopt);
   Http& set_post(const char* data, size_t len);
   Http& no_cache(bool no_cache = true);
   Http& set_cainfo(const std::string& pemfile);
@@ -52,7 +52,7 @@ class NEOPG_UNSTABLE_API Http {
  private:
   std::unique_ptr<CURL, void (*)(CURL*)> m_handle;
   std::string m_last_error;
-  boost::optional<std::string> m_post_data;
+  tao::optional<std::string> m_post_data;
   std::string m_connect_to;
   long m_maxfilesize;
 

@@ -21,7 +21,7 @@
 #ifndef G10_OPTIONS_H
 #define G10_OPTIONS_H
 
-#include <boost/optional.hpp>
+#include <tao/json/external/optional.hpp>
 #include <set>
 #include <string>
 #include <utility>
@@ -163,7 +163,7 @@ struct options {
   bool quiet{false};
   unsigned debug{0};
   bool armor{false};
-  boost::optional<std::string> outfile;
+  tao::optional<std::string> outfile;
   estream_t outfp{0}; /* Hack, sometimes used in place of outfile.  */
   off_t max_output{0};
 
@@ -172,9 +172,9 @@ struct options {
   bool mimemode{false};
   bool textmode{false};
   bool expert{false};
-  boost::optional<std::string> def_sig_expire{"0"};
+  tao::optional<std::string> def_sig_expire{"0"};
   bool ask_sig_expire{false};
-  boost::optional<std::string> def_cert_expire{"0"};
+  tao::optional<std::string> def_cert_expire{"0"};
   bool ask_cert_expire{false};
   bool batch{false};      /* run in batch mode */
   bool answer_yes{false}; /* answer yes on most questions */
@@ -197,7 +197,7 @@ struct options {
   int cert_digest_algo{0};
   int compress_algo{-1}; /* defaults to DEFAULT_COMPRESS_ALGO */
   std::vector<std::pair<std::string, unsigned int>> def_secret_key;
-  boost::optional<std::string> def_recipient;
+  tao::optional<std::string> def_recipient;
   int def_recipient_self{0};
   std::vector<std::string> secret_keys_to_try;
 
@@ -212,11 +212,11 @@ struct options {
   int completes_needed{1};
   int max_cert_depth{5};
 
-  boost::optional<std::string> def_new_key_algo;
+  tao::optional<std::string> def_new_key_algo;
 
   /* Options to be passed to the gpg-agent */
-  boost::optional<std::string> lc_ctype;
-  boost::optional<std::string> lc_messages;
+  tao::optional<std::string> lc_ctype;
+  tao::optional<std::string> lc_messages;
 
   bool skip_verify{false};
   bool skip_hidden_recipients{false};
@@ -250,7 +250,7 @@ struct options {
     unsigned int import_options{
         (IMPORT_REPAIR_KEYS | IMPORT_REPAIR_PKS_SUBKEY_BUG)};
     unsigned int export_options{EXPORT_ATTRIBUTES};
-    boost::optional<std::string> http_proxy;
+    tao::optional<std::string> http_proxy;
   } keyserver_options;
   unsigned int import_options{IMPORT_REPAIR_KEYS};
   unsigned int export_options{EXPORT_ATTRIBUTES};
@@ -258,8 +258,8 @@ struct options {
   unsigned int verify_options{
       (LIST_SHOW_UID_VALIDITY | VERIFY_SHOW_POLICY_URLS |
        VERIFY_SHOW_STD_NOTATIONS | VERIFY_SHOW_KEYSERVER_URLS)};
-  boost::optional<std::string> def_preference_list;
-  boost::optional<std::string> def_keyserver_url;
+  tao::optional<std::string> def_preference_list;
+  tao::optional<std::string> def_keyserver_url;
   std::vector<prefitem_t> personal_cipher_prefs;
   std::vector<prefitem_t> personal_digest_prefs;
   std::vector<prefitem_t> personal_compress_prefs;

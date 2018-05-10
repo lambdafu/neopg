@@ -1958,7 +1958,7 @@ u32 parse_expire_string(const char *string) {
   return seconds;
 }
 
-u32 parse_expire_string(boost::optional<std::string> str) {
+u32 parse_expire_string(tao::optional<std::string> str) {
   return parse_expire_string(str ? str->c_str() : NULL);
 }
 
@@ -2069,7 +2069,7 @@ u32 ask_expire_interval(int object, const char *def_expire) {
   return interval;
 }
 
-u32 ask_expire_interval(int object, boost::optional<std::string> def_expire) {
+u32 ask_expire_interval(int object, tao::optional<std::string> def_expire) {
   return ask_expire_interval(object, def_expire ? def_expire->c_str() : NULL);
 }
 

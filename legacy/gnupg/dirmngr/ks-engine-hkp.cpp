@@ -20,7 +20,7 @@
 
 #include <config.h>
 
-#include <boost/optional.hpp>
+#include <tao/json/external/optional.hpp>
 
 #include <assert.h>
 #include <stdio.h>
@@ -94,7 +94,7 @@ static std::string make_host_part(ctrl_t ctrl, const std::string &scheme,
    called to allow writing the post data.  If R_HTTP_STATUS is not
    NULL, the http status code will be stored there.  */
 static gpg_error_t send_request(ctrl_t ctrl, const std::string &url,
-                                boost::optional<std::string> post_data,
+                                tao::optional<std::string> post_data,
                                 std::string &response,
                                 unsigned int *r_http_status) {
   if (url.empty()) return GPG_ERR_INV_ARG;
@@ -206,7 +206,7 @@ gpg_error_t ks_hkp_search(ctrl_t ctrl, parsed_uri_t uri, const char *pattern,
 
   /* Send the request.  */
   response.clear();
-  err = send_request(ctrl, request, boost::none, response, r_http_status);
+  err = send_request(ctrl, request, tao::nullopt, response, r_http_status);
   if (err) return err;
 
   err = dirmngr_status(ctrl, "SOURCE", hostport.c_str(), NULL);
@@ -280,7 +280,7 @@ gpg_error_t ks_hkp_get(ctrl_t ctrl, parsed_uri_t uri, const char *keyspec,
 
   /* Send the request.  */
   response.clear();
-  err = send_request(ctrl, request, boost::none, response, NULL);
+  err = send_request(ctrl, request, tao::nullopt, response, NULL);
   if (err) return err;
 
   return dirmngr_status(ctrl, "SOURCE", hostport.c_str(), NULL);

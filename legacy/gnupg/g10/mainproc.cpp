@@ -76,7 +76,7 @@ struct mainproc_context {
     int data_fd;
     /* A list of filenames with the data files or NULL. This is only
        used if DATA_FD is -1. */
-    boost::optional<std::vector<std::string>> data_names;
+    tao::optional<std::vector<std::string>> data_names;
     /* Flag to indicated that either one of the next previous fields
        is used.  This is only needed for better readability. */
     int used;
@@ -978,7 +978,7 @@ int proc_packets(ctrl_t ctrl, void *anchor, iobuf_t a) {
 
 int proc_signature_packets(
     ctrl_t ctrl, void *anchor, iobuf_t a,
-    const boost::optional<std::vector<std::string>> &signedfiles,
+    const tao::optional<std::vector<std::string>> &signedfiles,
     const char *sigfilename) {
   CTX c = (CTX)xmalloc_clear(sizeof *c);
   int rc;
@@ -1026,7 +1026,7 @@ int proc_signature_packets_by_fd(ctrl_t ctrl, void *anchor, iobuf_t a,
   c->sigs_only = 1;
 
   c->signed_data.data_fd = signed_data_fd;
-  c->signed_data.data_names = boost::none;
+  c->signed_data.data_names = tao::nullopt;
   c->signed_data.used = (signed_data_fd != -1);
 
   rc = do_proc_packets(ctrl, c, a);

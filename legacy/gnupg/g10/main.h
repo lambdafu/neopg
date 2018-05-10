@@ -20,7 +20,7 @@
 #ifndef G10_MAIN_H
 #define G10_MAIN_H
 
-#include <boost/optional.hpp>
+#include <tao/json/external/optional.hpp>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -281,9 +281,9 @@ gpg_error_t delete_keys(ctrl_t ctrl, const std::vector<std::string> &names,
 /*-- keygen.c --*/
 const char *get_default_pubkey_algo(void);
 u32 parse_expire_string(const char *string);
-u32 parse_expire_string(boost::optional<std::string>);
+u32 parse_expire_string(tao::optional<std::string>);
 u32 ask_expire_interval(int object, const char *def_expire);
-u32 ask_expire_interval(int object, boost::optional<std::string>);
+u32 ask_expire_interval(int object, tao::optional<std::string>);
 u32 ask_expiredate(void);
 unsigned int ask_key_flags(int algo, int subkey, unsigned int current);
 void quick_generate_keypair(ctrl_t ctrl, const char *uid, const char *algostr,
@@ -447,7 +447,7 @@ void decrypt_messages(ctrl_t ctrl, int nfiles, char *files[]);
 
 /*-- plaintext.c --*/
 int hash_datafiles(gcry_md_hd_t md, gcry_md_hd_t md2,
-                   const boost::optional<std::vector<std::string>> &files,
+                   const tao::optional<std::vector<std::string>> &files,
                    const char *sigfilename, int textmode);
 int hash_datafile_by_fd(gcry_md_hd_t md, gcry_md_hd_t md2, int data_fd,
                         int textmode);

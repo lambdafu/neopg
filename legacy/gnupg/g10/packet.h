@@ -22,7 +22,7 @@
 #ifndef G10_PACKET_H
 #define G10_PACKET_H
 
-#include <boost/optional.hpp>
+#include <tao/json/external/optional.hpp>
 #include <string>
 #include <vector>
 
@@ -565,7 +565,7 @@ void reset_literals_seen(void);
 int proc_packets(ctrl_t ctrl, void *ctx, iobuf_t a);
 int proc_signature_packets(
     ctrl_t ctrl, void *ctx, iobuf_t a,
-    const boost::optional<std::vector<std::string>> &signedfiles,
+    const tao::optional<std::vector<std::string>> &signedfiles,
     const char *sigfile);
 int proc_signature_packets_by_fd(ctrl_t ctrl, void *anchor, IOBUF a,
                                  int signed_data_fd);
