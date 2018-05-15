@@ -90,7 +90,25 @@ environment variables, e.g.:
 $ CXX=clang++-5 CXXSTD=14 cmake ..
 ```
 
-### Development
+### Legacy support
+
+You can create links to the `neopg` binary under a name that ends with
+a legacy subcommand.  If called through such a link, `neopg` will
+invoke that subcommand directly.  For example, `neo-gpg2 --version`
+would be the same as `neopg gpg2 --version`, and so on.  Examples for
+names that would behave that way are `neopg-gpg2`, `neo-gpg2`,
+`neogpg2`, `gpg2` etc.  Here is a list of supported endings:
+
+| Ending           | Subcommand       |
+| ---------------- | ---------------- |
+| `gpg`            | `gpg2`           |
+| `gpg2`           | `gpg2`           |
+| `agent`          | `agent`          |
+| `scd`            | `scd`            |
+| `dirmngr`        | `dirmngr`        |
+| `dirmngr-client` | `dirmngr-client` |
+
+## Development
 
 Development builds have extra dependencies:
 

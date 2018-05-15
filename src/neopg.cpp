@@ -8,6 +8,7 @@
 
 #include <CLI11.hpp>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/format.hpp>
 #include <boost/locale.hpp>
 
@@ -106,7 +107,22 @@ int main(int argc, char* argv[]) {
   /* This is also used to invoke ourself.  */
   neopg_program = make_absfilename(argv[0], NULL);
 
-  const std::vector<std::string> args(argv + 1, argv + argc);
+  std::vector<std::string> args(argv + 1, argv + argc);
+
+  // Allow some aliases of the program name for legacy support.
+  if (boost::algorithm::ends_with(neopg_program, "gpg") ||
+      boost::algorithm::ends_with(neopg_program, "gpg2")) {
+    args.emplace(args.begin(), "gpg2");
+  } else if (boost::algorithm::ends_with(neopg_program, "gpgsm"))
+    args.emplace(args.begin(), "gpgsm");
+  else if (boost::algorithm::ends_with(neopg_program, "agent"))
+    args.emplace(args.begin(), "agent");
+  else if (boost::algorithm::ends_with(neopg_program, "scd"))
+    args.emplace(args.begin(), "scd");
+  else if (boost::algorithm::ends_with(neopg_program, "dirmngr"))
+    args.emplace(args.begin(), "dirmngr");
+  else if (boost::algorithm::ends_with(neopg_program, "dirmngr-client"))
+    args.emplace(args.begin(), "dirmngr-client");
 
   CLI::App app{_("NeoPG implements the OpenPGP standard.")};
 
@@ -160,7 +176,11 @@ int main(int argc, char* argv[]) {
   CatCommand cmd_cat(app, "cat", "the beginning of a new Unix system",
                      tools_group);
 
-  CLI11_PARSE(app, argc, argv);
+  std::vector<const char*> argvec;
+  argvec.emplace_back(neopg_program);
+  for (const auto& arg : args) argvec.emplace_back(arg.c_str());
+
+  CLI11_PARSE(app, argvec.size(), const_cast<char**>(argvec.data()));
   if (oVersion) cmd_version.run();
 
   return 0;
