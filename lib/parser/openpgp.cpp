@@ -15,29 +15,6 @@ using namespace tao::neopg_pegtl;
 
 namespace openpgp {
 
-// A custom rule to match individual bits.
-template <uint8_t Mask, uint8_t From, uint8_t To = 0>
-struct mask_cmp {
-  static const uint8_t from = From;
-  static const uint8_t to = To ? To : From;
-
-  template <typename Input>
-  static bool match(Input& in) {
-    if (!in.empty()) {
-      uint8_t val = in.peek_byte() & Mask;
-      if (val >= from && val <= to) {
-        in.bump(1);
-        return true;
-      }
-    }
-    return false;
-  }
-};
-
-// A custom rule to match a range of binary bytes.
-template <uint8_t From, uint8_t To = 0>
-struct bin_range : mask_cmp<0xff, From, To> {};
-
 // The OpenPGP parser is stateful (due to the length field), so the state,
 // grammar and actions are tightly coupled.
 struct state {
@@ -97,10 +74,10 @@ struct old_packet_length_na : success {};
 
 struct old_packet_tag : any {};
 
-struct is_old_packet_with_length_one : at<mask_cmp<0x03, 0x00>> {};
-struct is_old_packet_with_length_two : at<mask_cmp<0x03, 0x01>> {};
-struct is_old_packet_with_length_four : at<mask_cmp<0x03, 0x02>> {};
-struct is_old_packet_with_length_na : at<mask_cmp<0x03, 0x03>> {};
+struct is_old_packet_with_length_one : at<uint8::mask_one<0x03, 0x00>> {};
+struct is_old_packet_with_length_two : at<uint8::mask_one<0x03, 0x01>> {};
+struct is_old_packet_with_length_four : at<uint8::mask_one<0x03, 0x02>> {};
+struct is_old_packet_with_length_na : at<uint8::mask_one<0x03, 0x03>> {};
 
 struct old_packet_with_length_one
     : seq<is_old_packet_with_length_one, old_packet_tag, old_packet_length_one,
@@ -116,7 +93,7 @@ struct old_packet_with_length_na
           packet_body_indeterminate> {};
 
 // Old packets have bit 6 clear.
-struct is_old_packet : at<mask_cmp<0x40, 0x00>> {};
+struct is_old_packet : at<uint8::mask_one<0x40, 0x00>> {};
 
 // For old packets, the length type is encoded in the tag.  We differentiate
 // before consuming the tag.
@@ -125,9 +102,9 @@ struct old_packet
           sor<old_packet_with_length_one, old_packet_with_length_two,
               old_packet_with_length_four, old_packet_with_length_na>> {};
 
-struct new_packet_length_one : bin_range<0x00, 0xbf> {};
-struct new_packet_length_two : seq<bin_range<0xc0, 0xdf>, any> {};
-struct new_packet_length_partial : bin_range<0xe0, 0xfe> {};
+struct new_packet_length_one : uint8::range<0x00, 0xbf> {};
+struct new_packet_length_two : seq<uint8::range<0xc0, 0xdf>, any> {};
+struct new_packet_length_partial : uint8::range<0xe0, 0xfe> {};
 struct new_packet_length_five : seq<one<(char)0xff>, bytes<4>> {};
 
 struct new_packet_data_partial : seq<new_packet_length_partial, packet_body> {};
@@ -146,13 +123,13 @@ struct new_packet_data
 struct new_packet_tag : any {};
 
 // A new packet tag has bit 6 set.
-struct is_new_packet : at<mask_cmp<0x40, 0x40>> {};
+struct is_new_packet : at<uint8::mask_one<0x40, 0x40>> {};
 
 // A new packet consists of a tag and one or more length and data parts.
 struct new_packet : seq<is_new_packet, new_packet_tag, new_packet_data> {};
 
 // Every packet starts with a tag that has bit 7 set.
-struct is_packet : at<mask_cmp<0x80, 0x80>> {};
+struct is_packet : at<uint8::mask_one<0x80, 0x80>> {};
 
 // A packet is either in the new or old format.
 struct packet : seq<discard, is_packet, sor<new_packet, old_packet>> {};
@@ -350,7 +327,7 @@ void RawPacketParser::process(Botan::DataSource& source) {
 
   auto state = openpgp::state{m_sink};
   auto reader = [this, &source, &state](
-      char* buffer, const std::size_t length) mutable -> size_t {
+                    char* buffer, const std::size_t length) mutable -> size_t {
     size_t count = source.read(reinterpret_cast<uint8_t*>(buffer), length);
     return count;
   };
