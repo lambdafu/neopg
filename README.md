@@ -157,12 +157,9 @@ openpgp profile
 ## Hacking
 
 ### Fedora
-To get started on a Fedora 26, do the following
+To get started on Fedora 28, or later, do the following.
 
 ```
-# Fedora 26 only comes with Botan 1.10. Here we enable a copr repo for Botan 2
-$ sudo dnf copr enable bkircher/botan2
-
 # Install dev dependencies
 $ sudo dnf install -y \
     boost-devel \
@@ -171,8 +168,9 @@ $ sudo dnf install -y \
     gcc-c++ \
     gcovr \
     git \
+    gnutls-devel \
     lcov \
-    libusb-devel \
+    libusbx-devel \
     python \
     sqlite-devel \
 
