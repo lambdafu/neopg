@@ -22,6 +22,7 @@ struct state {
   PacketType packet_type;
   size_t packet_pos;
   std::unique_ptr<PacketHeader> header;
+  std::unique_ptr<NewPacketLength> length;
 
   // The exception object if a packet could not be parsed.
   std::unique_ptr<ParserError> exc;
@@ -259,21 +260,31 @@ struct action<new_packet_length_one> {
   template <typename Input>
   static void apply(const Input& in, state& st) {
     st.packet_len = in.peek_byte();
-    st.header = NeoPG::make_unique<NewPacketHeader>(
-        st.packet_type, st.packet_len, PacketLengthType::OneOctet);
-    st.header->m_offset = st.packet_pos;
+    if (st.started == false) {
+      st.header = NeoPG::make_unique<NewPacketHeader>(
+          st.packet_type, st.packet_len, PacketLengthType::OneOctet);
+      st.header->m_offset = st.packet_pos;
+    } else {
+      st.length = NeoPG::make_unique<NewPacketLength>(
+          st.packet_len, PacketLengthType::OneOctet);
+    }
     st.partial = false;
   }
-};
+};  // namespace openpgp
 
 template <>
 struct action<new_packet_length_two> {
   template <typename Input>
   static void apply(const Input& in, state& st) {
     st.packet_len = ((in.peek_byte() - 0xc0) << 8) + in.peek_byte(1) + 192;
-    st.header = NeoPG::make_unique<NewPacketHeader>(
-        st.packet_type, st.packet_len, PacketLengthType::TwoOctet);
-    st.header->m_offset = st.packet_pos;
+    if (st.started == false) {
+      st.header = NeoPG::make_unique<NewPacketHeader>(
+          st.packet_type, st.packet_len, PacketLengthType::TwoOctet);
+      st.header->m_offset = st.packet_pos;
+    } else {
+      st.length = NeoPG::make_unique<NewPacketLength>(
+          st.packet_len, PacketLengthType::TwoOctet);
+    }
     st.partial = false;
   }
 };
@@ -287,9 +298,14 @@ struct action<new_packet_length_five> {
     auto val2 = (uint32_t)in.peek_byte(3);
     auto val3 = (uint32_t)in.peek_byte(4);
     st.packet_len = (val0 << 24) + (val1 << 16) + (val2 << 8) + val3;
-    st.header = NeoPG::make_unique<NewPacketHeader>(
-        st.packet_type, st.packet_len, PacketLengthType::FiveOctet);
-    st.header->m_offset = st.packet_pos;
+    if (st.started == false) {
+      st.header = NeoPG::make_unique<NewPacketHeader>(
+          st.packet_type, st.packet_len, PacketLengthType::FiveOctet);
+      st.header->m_offset = st.packet_pos;
+    } else {
+      st.length = NeoPG::make_unique<NewPacketLength>(
+          st.packet_len, PacketLengthType::FiveOctet);
+    }
     st.partial = false;
   }
 };
@@ -300,9 +316,14 @@ struct action<new_packet_length_partial> {
   static void apply(const Input& in, state& st) {
     st.packet_len = 1 << (in.peek_byte() & 0x1f);
     // FIXME: Not necessary if started == true. Would save one allocation.
-    st.header = NeoPG::make_unique<NewPacketHeader>(
-        st.packet_type, st.packet_len, PacketLengthType::Partial);
-    st.header->m_offset = st.packet_pos;
+    if (st.started == false) {
+      st.header = NeoPG::make_unique<NewPacketHeader>(
+          st.packet_type, st.packet_len, PacketLengthType::Partial);
+      st.header->m_offset = st.packet_pos;
+    } else {
+      st.length = NeoPG::make_unique<NewPacketLength>(
+          st.packet_len, PacketLengthType::Partial);
+    }
     st.partial = true;
   }
 };
@@ -313,6 +334,7 @@ struct action<is_packet> {
   static void apply(const Input& in, state& st) {
     st.packet_type = PacketType::Reserved;
     st.header.reset(nullptr);
+    st.length.reset(nullptr);
     st.exc.reset(nullptr);
     st.partial = false;
     st.started = false;
@@ -338,7 +360,7 @@ struct action<packet_body_data> {
         if (st.exc) throw *st.exc;
 
         st.sink.start_packet(std::move(st.header));
-        st.sink.continue_packet(data, length);
+        st.sink.continue_packet(nullptr, data, length);
       }
       st.started = true;
     } else {
@@ -347,12 +369,9 @@ struct action<packet_body_data> {
       if (st.exc) throw *st.exc;
 
       if (st.partial) {
-        st.sink.continue_packet(data, length);
+        st.sink.continue_packet(std::move(st.length), data, length);
       } else {
-        // FIXME: Use the one from header (requires dynamic cast which may be
-        // 0).
-        st.sink.finish_packet(NeoPG::make_unique<NewPacketLength>(length), data,
-                              length);
+        st.sink.finish_packet(std::move(st.length), data, length);
       }
     }
     // auto packet = NeoPG::make_unique::make_unique<NeoPG::RawPacket>();

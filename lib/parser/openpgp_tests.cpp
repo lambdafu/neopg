@@ -40,7 +40,8 @@ class TestSink : public RawPacketSink {
   }
 
   void start_packet(std::unique_ptr<PacketHeader> header) {}
-  void continue_packet(const char* data, size_t length) {}
+  void continue_packet(std::unique_ptr<NewPacketLength> length_info,
+                       const char* data, size_t length) {}
   void finish_packet(std::unique_ptr<NewPacketLength> length_info,
                      const char* data, size_t length) {}
   void error_packet(std::unique_ptr<PacketHeader> header,
