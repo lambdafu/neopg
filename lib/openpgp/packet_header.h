@@ -64,10 +64,10 @@ struct NEOPG_UNSTABLE_API PacketHeader {
  public:
   size_t m_offset;
 
-  virtual void write(std::ostream& out) = 0;
-  virtual PacketType type() = 0;
+  virtual void write(std::ostream& out) const = 0;
+  virtual PacketType type() const = 0;
 
-  virtual uint32_t length() = 0;
+  virtual uint32_t length() const = 0;
 
   // Prevent memory leak when upcasting in smart pointer containers.
   virtual ~PacketHeader() = default;
@@ -94,10 +94,10 @@ class NEOPG_UNSTABLE_API OldPacketHeader : public PacketHeader {
   void set_length(uint32_t length,
                   PacketLengthType length_type = PacketLengthType::Default);
 
-  void write(std::ostream& out) override;
+  void write(std::ostream& out) const override;
 
-  PacketType type() override { return m_packet_type; }
-  uint32_t length() override { return m_length; }
+  PacketType type() const override { return m_packet_type; }
+  uint32_t length() const override { return m_length; }
 };
 
 class NEOPG_UNSTABLE_API NewPacketTag {
@@ -108,7 +108,7 @@ class NEOPG_UNSTABLE_API NewPacketTag {
 
   NewPacketTag(PacketType packet_type);
 
-  void write(std::ostream& out);
+  void write(std::ostream& out) const;
 };
 
 class NEOPG_UNSTABLE_API NewPacketLength {
@@ -126,7 +126,7 @@ class NEOPG_UNSTABLE_API NewPacketLength {
   NewPacketLength(uint32_t length,
                   PacketLengthType length_type = PacketLengthType::Default);
 
-  void write(std::ostream& out);
+  void write(std::ostream& out) const;
 };
 
 class NEOPG_UNSTABLE_API NewPacketHeader : public PacketHeader {
@@ -144,10 +144,10 @@ class NEOPG_UNSTABLE_API NewPacketHeader : public PacketHeader {
                   PacketLengthType length_type = PacketLengthType::Default)
       : m_tag(packet_type), m_length(length, length_type) {}
 
-  void write(std::ostream& out) override;
+  void write(std::ostream& out) const override;
 
-  PacketType type() override { return m_tag.m_packet_type; }
-  uint32_t length() override { return m_length.m_length; }
+  PacketType type() const override { return m_tag.m_packet_type; }
+  uint32_t length() const override { return m_length.m_length; }
 };
 
 }  // namespace NeoPG

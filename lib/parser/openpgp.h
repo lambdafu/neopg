@@ -25,14 +25,14 @@ class NEOPG_UNSTABLE_API RawPacketSink {
 
   // Called after start_packet. Data is passed by
   // reference and only valid during execution of this function.  If length_info
-  // is nullptr, then this is an old header indeterminate length packet.
-
+  // is nullptr, then this is either an old header indeterminate length packet,
+  // or the first new header partial data after start_packet.
   virtual void continue_packet(std::unique_ptr<NewPacketLength> length_info,
                                const char* data, size_t length) = 0;
 
   // Called eventually after start_packet and zero or more continue_packet
   // calls.  The LENGTH_INFO allows to reconstruct the original binary stream
-  // (only valid for new packet format)..
+  // (only valid for new packet format).
   virtual void finish_packet(std::unique_ptr<NewPacketLength> length_info,
                              const char* data, size_t length) = 0;
 

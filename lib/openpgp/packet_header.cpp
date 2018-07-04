@@ -49,7 +49,7 @@ void OldPacketHeader::set_length(uint32_t length,
   m_length = length;
 }
 
-void OldPacketHeader::write(std::ostream& out) {
+void OldPacketHeader::write(std::ostream& out) const {
   PacketLengthType lentype = m_length_type;
   if (lentype == PacketLengthType::Default)
     lentype = best_length_type(m_length);
@@ -98,7 +98,7 @@ NewPacketTag::NewPacketTag(PacketType packet_type) {
   set_packet_type(packet_type);
 }
 
-void NewPacketTag::write(std::ostream& out) {
+void NewPacketTag::write(std::ostream& out) const {
   uint8_t tag = 0x80 | 0x40 | (uint8_t)m_packet_type;
   out << (uint8_t)tag;
 }
@@ -139,7 +139,7 @@ NewPacketLength::NewPacketLength(uint32_t length,
   set_length(length, length_type);
 }
 
-void NewPacketLength::write(std::ostream& out) {
+void NewPacketLength::write(std::ostream& out) const {
   PacketLengthType lentype = m_length_type;
   if (lentype == PacketLengthType::Default)
     lentype = best_length_type(m_length);
@@ -174,7 +174,7 @@ void NewPacketLength::write(std::ostream& out) {
   }
 }
 
-void NewPacketHeader::write(std::ostream& out) {
+void NewPacketHeader::write(std::ostream& out) const {
   m_tag.write(out);
   m_length.write(out);
 }
