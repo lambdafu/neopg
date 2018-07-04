@@ -4,8 +4,6 @@
    NeoPG is released under the Simplified BSD License (see license.txt)
 */
 
-#include <neopg-tool/command.h>
-//#include <neopg-tool/dump_packet_command.h>
 #include <neopg-tool/packet_command.h>
 
 #include <neopg/marker_packet.h>
@@ -30,7 +28,7 @@
 
 #include <iostream>
 
-namespace NeoPG {
+using namespace NeoPG;
 
 void MarkerPacketCommand::run() {
   MarkerPacket packet;
@@ -95,12 +93,6 @@ static void process_msg(Botan::DataSource& source, Botan::DataSink& out) {
               << rang::style::reset
               << ":unrecoverable error:" << exc.as_string() << "\n";
   }
-  // Botan::secure_vector<uint8_t> buffer(Botan::DEFAULT_BUFFERSIZE);
-  // while (!source.end_of_data()) {
-  //   size_t got = source.read(buffer.data(), buffer.size());
-  //   std::cerr << "XXX " << got << "\n";
-  //   out.write(buffer.data(), got);
-  // }
   out.end_msg();
 }
 
@@ -126,10 +118,9 @@ PacketCommand::PacketCommand(CLI::App& app, const std::string& flag,
     : Command(app, flag, description, group_name),
       cmd_marker(m_cmd, "marker", "output a Marker Packet", group_write),
       cmd_uid(m_cmd, "uid", "output a User ID Packet", group_write),
-      cmd_filter(m_cmd, "filter", "process packet data", group_process) {}
+      cmd_filter(m_cmd, "filter", "process packet data", group_process),
+      cmd_dump(m_cmd, "dump", "convert packet data", group_process) {}
 
 void PacketCommand::run() {
   if (m_cmd.get_subcommands().empty()) throw CLI::CallForHelp();
 }
-
-}  // Namespace NeoPG

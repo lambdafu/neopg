@@ -14,6 +14,9 @@ set(NeopgToolHeaders
   cli/command.h
   cli/compress_command.h
   cli/hash_command.h
+  cli/packet/dump/legacy_dump.h
+  cli/packet/dump_packet_command.h
+  cli/packet/dump_packet_sink.h
   cli/packet_command.h
   cli/random_command.h
   cli/version_command.h
@@ -26,6 +29,9 @@ add_library(neopg-tool STATIC
   cli/command.cpp
   cli/compress_command.cpp
   cli/hash_command.cpp
+  cli/packet/dump/legacy_dump.cpp
+  cli/packet/dump_packet_command.cpp
+  cli/packet/dump_packet_sink.cpp
   cli/packet_command.cpp
   cli/random_command.cpp
   cli/version_command.cpp

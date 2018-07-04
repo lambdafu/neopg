@@ -7,6 +7,7 @@
 #pragma once
 
 #include <neopg-tool/command.h>
+#include <neopg-tool/dump_packet_command.h>
 
 namespace NeoPG {
 
@@ -54,6 +55,7 @@ class PacketCommand : public Command {
   MarkerPacketCommand cmd_marker;
   UserIdPacketCommand cmd_uid;
   FilterPacketCommand cmd_filter;
+  DumpPacketCommand cmd_dump;
 
   virtual void run();
 
