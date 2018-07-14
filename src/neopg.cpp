@@ -40,6 +40,7 @@ static void setup_locale() {
 #include <neopg-tool/cat_command.h>
 #include <neopg-tool/command.h>
 #include <neopg-tool/compress_command.h>
+#include <neopg-tool/curl_command.h>
 #include <neopg-tool/hash_command.h>
 #include <neopg-tool/packet_command.h>
 #include <neopg-tool/random_command.h>
@@ -207,6 +208,7 @@ int main(int argc, char* argv[]) {
   PacketCommand cmd_packet(app, "packet", "read and write OpenPGP packets",
                            tools_group);
   RandomCommand cmd_random(app, "random", "output random bytes", tools_group);
+  CurlCommand cmd_curl(app, "curl", "fetch an URL", tools_group);
   HashCommand cmd_hash(app, "hash", "calculate hash function", tools_group);
   CompressCommand cmd_compress(app, "compress", "compress and decompress data",
                                tools_group);

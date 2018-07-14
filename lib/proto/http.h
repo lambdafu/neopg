@@ -16,10 +16,10 @@
 namespace NeoPG {
 
 class NEOPG_UNSTABLE_API Http {
-  const long MAX_REDIRECTS_DEFAULT = 2;
-  const long MAX_FILESIZE_DEFAULT = 2 * 1024 * 1024;
-
  public:
+  static const long MAX_REDIRECTS_DEFAULT{2};
+  static const long MAX_FILESIZE_DEFAULT{2 * 1024 * 1024};
+
   Http();
 
   Http& forbid_reuse(bool no_reuse = true);
