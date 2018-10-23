@@ -23,7 +23,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-#include <neopg/http.h>
+#include <neopg/proto/http.h>
 
 #include "crlfetch.h"
 

@@ -55,10 +55,10 @@ add_custom_target(tests)
 enable_testing()
 
 # PEGTL
-set(PEGTL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/pegtl)
-set(PEGTL_INCLUDE_DIR ${PEGTL_ROOT}/include)
+set(TAO-PEGTL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/pegtl)
+set(PEGTL_INCLUDE_DIR ${TAO-PEGTL_ROOT}/include)
 set(PEGTL_BUILD_TESTS OFF CACHE BOOL "")
-add_subdirectory(${PEGTL_ROOT} EXCLUDE_FROM_ALL)
+add_subdirectory(${TAO-PEGTL_ROOT} EXCLUDE_FROM_ALL)
 
 
 # Rang
@@ -74,10 +74,10 @@ set(SPDLOG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/spdlog)
 set(SPDLOG_INCLUDE_DIR ${SPDLOG_ROOT}/include)
 
 # json
-set(JSON_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/json)
-set(JSON_INCLUDE_DIR ${JSON_ROOT}/include)
+set(TAOCPP-JSON_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/json)
+set(JSON_INCLUDE_DIR ${TAOCPP-JSON_ROOT}/include)
 set(TAOCPP_JSON_BUILD_TESTS OFF CACHE BOOL "")
-add_subdirectory(${JSON_ROOT} EXCLUDE_FROM_ALL)
+add_subdirectory(${TAOCPP-JSON_ROOT} EXCLUDE_FROM_ALL)
 
 # CodeCoverage
 
@@ -86,30 +86,30 @@ ProcessorCount(PROCESSOR_COUNT)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 
-option(COVERAGE "Create coverage data")
+  option(COVERAGE "Create coverage data")
 
-if(COVERAGE)
+  if(COVERAGE)
 
-include(CodeCoverage)
-APPEND_COVERAGE_COMPILER_FLAGS()
+    include(CodeCoverage)
+    APPEND_COVERAGE_COMPILER_FLAGS()
 
-set(COVERAGE_EXCLUDES '*/3rdparty/*' '*/usr/*' '*/nix/store/*')
-SETUP_TARGET_FOR_COVERAGE(
-     NAME coverage
-     EXECUTABLE ctest
-     DEPENDENCIES tests
-)
-SETUP_TARGET_FOR_COVERAGE_HTML(
-     NAME coverage-html
-     EXECUTABLE ctest
-     DEPENDENCIES tests
-)
-SETUP_TARGET_FOR_COVERAGE_COBERTURA(
-     NAME coverage-data
-     EXECUTABLE ctest
-     DEPENDENCIES tests
-)
-endif(COVERAGE)
+    set(COVERAGE_EXCLUDES '*/3rdparty/*' '*/usr/*' '*/nix/store/*')
+    SETUP_TARGET_FOR_COVERAGE(
+	 NAME coverage
+	 EXECUTABLE ctest
+	 DEPENDENCIES tests
+    )
+    SETUP_TARGET_FOR_COVERAGE_HTML(
+	 NAME coverage-html
+	 EXECUTABLE ctest
+	 DEPENDENCIES tests
+    )
+    SETUP_TARGET_FOR_COVERAGE_COBERTURA(
+	 NAME coverage-data
+	 EXECUTABLE ctest
+	 DEPENDENCIES tests
+    )
+  endif(COVERAGE)
 
 endif(CMAKE_BUILD_TYPE MATCHES Debug)
 
@@ -124,7 +124,7 @@ if(BUILD_DOC)
         message(FATAL_ERROR "Doxygen is needed to build the documentation.")
     endif()
 
-    set(DOXYFILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/src/Doxyfile.in)
+    set(DOXYFILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/neopg-tool/Doxyfile.in)
     set(DOXYFILE ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 
     configure_file(${DOXYFILE_IN} ${DOXYFILE} @ONLY)
@@ -140,26 +140,27 @@ if(BUILD_DOC)
 endif()
 
 find_package(PkgConfig)
-pkg_check_modules(SQLITE3 REQUIRED sqlite3)
-pkg_check_modules(BOTAN2 REQUIRED botan-2)
-pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
-pkg_check_modules(GNUTLS REQUIRED gnutls)
+pkg_check_modules(sqlite REQUIRED IMPORTED_TARGET sqlite3)
+pkg_check_modules(botan-2 REQUIRED IMPORTED_TARGET botan-2)
+pkg_check_modules(libusb-1.0 REQUIRED IMPORTED_TARGET libusb-1.0)
+pkg_check_modules(gnutls REQUIRED IMPORTED_TARGET gnutls)
+
+find_package(Boost COMPONENTS locale REQUIRED)
 
 find_package(CURL REQUIRED)
+find_package(Threads)
 
-# Example how to test for header files and functions with cmake:
-# include(CheckIncludeFiles)
-# check_include_files(malloc.h HAVE_MALLOC_H)
-# include (CheckFunctionExists)
-# check_function_exists (log HAVE_LOG)
-# check_function_exists (exp HAVE_EXP)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/neopg-tool/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/config.h
+  DESTINATION include
+)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/legacy)
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib)
-add_subdirectory(${CMAKE_SOURCE_DIR}/src)
+add_subdirectory(neopg)
+add_subdirectory(legacy)
+add_subdirectory(neopg-tool)
 
+install(EXPORT neopg NAMESPACE neopg:: DESTINATION lib/cmake/neopg)
 
 # get all project files
 file(GLOB_RECURSE ALL_SOURCE_FILES
@@ -197,12 +198,3 @@ add_custom_target(
   COMMAND ${CLANG_FORMAT} -style=file -i ${ALL_SOURCE_FILES}
 )
 
-
-#if(CMAKE_COMPILER_IS_GNUCXX)
-#  target_compile_options(foo
-#  PUBLIC -fno-...)
-#endif()
-#target_compile_features(foo
-#PUBLIC cxx_auto_type
-#PRIVATE
-#cxx_variadic_templates)

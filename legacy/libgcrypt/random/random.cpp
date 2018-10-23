@@ -24,7 +24,7 @@
 
 #include <config.h>
 
-#include <neopg/rng.h>
+#include <neopg/crypto/rng.h>
 
 #include "g10lib.h"
 

@@ -38,7 +38,7 @@
 #include "gettime.h"
 #include "util.h"
 
-#include <neopg/time.h>
+#include <neopg/utils/time.h>
 #define timegm NeoPG::timegm
 
 #ifdef HAVE_UNSIGNED_TIME_T

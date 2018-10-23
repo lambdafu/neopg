@@ -28,7 +28,7 @@
 #include <time.h>
 
 #include <botan/rfc3394.h>
-#include <neopg/rng.h>
+#include <neopg/crypto/rng.h>
 
 #include "agent.h"
 

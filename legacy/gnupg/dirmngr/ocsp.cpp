@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <neopg/http.h>
+#include <neopg/proto/http.h>
 
 #include "certcache.h"
 #include "dirmngr.h"

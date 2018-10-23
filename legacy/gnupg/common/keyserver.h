@@ -30,7 +30,7 @@
 #ifndef GNUPG_COMMON_KEYSERVER_H
 #define GNUPG_COMMON_KEYSERVER_H
 
-#include <neopg/uri.h>
+#include <neopg/proto/uri.h>
 #include <string>
 #include <vector>
 

@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <neopg/http.h>
+#include <neopg/proto/http.h>
 
 #include "../common/userids.h"
 #include "dirmngr.h"

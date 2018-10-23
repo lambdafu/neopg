@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <neopg/http.h>
+#include <neopg/proto/http.h>
 
 #include "dirmngr.h"
 #include "ks-engine.h"

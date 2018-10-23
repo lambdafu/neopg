@@ -5,7 +5,16 @@
 
 # libgpg-error
 
+if(WIN32)
+  set(GPG-ERROR-WIN32_SOURCES
+    libgpg-error/src/w32-add.h
+    libgpg-error/src/w32-estream.cpp
+    libgpg-error/src/w32-lock.cpp
+    libgpg-error/src/w32-thread.cpp)
+endif()
+
 add_library(gpg-error STATIC
+  ${GPG-ERROR-WIN32_SOURCES}
   libgpg-error/src/gpg-error.h
   libgpg-error/src/b64dec.cpp
   libgpg-error/src/code-from-errno.cpp
@@ -21,26 +30,26 @@ add_library(gpg-error STATIC
   libgpg-error/src/visibility.cpp
 )
 
-if(WIN32)
-  target_sources(gpg-error PRIVATE
-    libgpg-error/src/w32-add.h
-    libgpg-error/src/w32-estream.cpp
-    libgpg-error/src/w32-lock.cpp
-    libgpg-error/src/w32-thread.cpp
-  )
-endif()
 
 add_library(neopg::gpg-error ALIAS gpg-error)
 
-target_include_directories(gpg-error PRIVATE
-  libgpg-error/src
-  ${Intl_INCLUDE_DIRS}
-  ${CMAKE_BINARY_DIR}/.)
-target_compile_definitions(gpg-error PRIVATE
-  HAVE_CONFIG_H=1)
-target_link_libraries(gpg-error PRIVATE pthread
-  ${Intl_LDFLAGS} ${Intl_LIBRARIES})
-target_compile_options(gpg-error PRIVATE
+target_include_directories(gpg-error PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libgpg-error/src>
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<INSTALL_INTERFACE:include>
+)
+
+install(DIRECTORY libgpg-error/src/
+  DESTINATION include
+  FILES_MATCHING PATTERN *.h
+)
+
+install(TARGETS gpg-error
+  EXPORT neopg
+  ARCHIVE
+    DESTINATION lib
+  PUBLIC_HEADER
+    DESTINATION include
 )
 
 add_executable(gpg-error-test
@@ -50,18 +59,24 @@ add_executable(gpg-error-test
   libgpg-error/tests/t-syserror.cpp
   libgpg-error/tests/gpg-error-test.cpp
 )
-target_include_directories(gpg-error-test PRIVATE
-  libgpg-error/src
-  ${CMAKE_BINARY_DIR}/.)
-target_link_libraries(gpg-error-test PRIVATE
-  gpg-error
-  GTest::GTest GTest::Main)
+target_link_libraries(gpg-error-test PUBLIC
+  neopg::gpg-error
+  GTest::GTest
+  GTest::Main
+)
+
 add_test(GpgErrorTest gpg-error-test COMMAND gpg-error-test test_xml_output --gtest_output=xml:gpg-error-test.xml)
-add_dependencies(tests gpg-error-test)
 
 # libassuan
 
+if(WIN32)
+  set(ASSUAN_SYSTEM_CPP libassuan/src/system-w32.cpp)
+else()
+  set(ASSUAN_SYSTEM_CPP libassuan/src/system-posix.cpp)
+endif()
+
 add_library(assuan STATIC
+  ${ASSUAN_SYSTEM_CPP}
   libassuan/src/assuan-buffer.cpp
   libassuan/src/assuan-defs.h
   libassuan/src/assuan-error.cpp
@@ -84,43 +99,47 @@ add_library(assuan STATIC
   libassuan/src/system.cpp
 )
 
-if(WIN32)
-  target_sources(assuan PRIVATE
-    libassuan/src/system-w32.cpp
-  )
-else()
-  target_sources(assuan PRIVATE
-    libassuan/src/system-posix.cpp
-)
-endif()
-
-target_compile_options(assuan PRIVATE
-)
-
 add_library(neopg::assuan ALIAS assuan)
 
-target_include_directories(assuan PRIVATE
-  libgpg-error/src
-  libassuan/src
-  ${CMAKE_BINARY_DIR}/.)
-target_compile_definitions(assuan PRIVATE
-  HAVE_CONFIG_H=1)
-target_link_libraries(assuan PRIVATE gpg-error)
+target_include_directories(assuan PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libassuan/src>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_compile_definitions(assuan PUBLIC
+  HAVE_CONFIG_H=1
+)
+target_link_libraries(assuan PUBLIC
+  neopg::gpg-error
+)
+
+install(DIRECTORY libassuan/src/
+  DESTINATION include
+  FILES_MATCHING PATTERN *.h
+)
+
+install(TARGETS assuan
+  EXPORT neopg
+  ARCHIVE
+    DESTINATION lib
+  PUBLIC_HEADER
+    DESTINATION include
+)
+
 
 add_executable(assuan-test
   libassuan/tests/fdpassing.cpp
-  libassuan/tests/assuan-test.cpp)
-target_include_directories(assuan-test PRIVATE
-  libgpg-error/src
-  libassuan/src
-  ${CMAKE_BINARY_DIR}/.)
-target_compile_definitions(assuan-test PRIVATE
-CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}/legacy/libassuan/tests")
-target_compile_options(assuan-test PRIVATE
+  libassuan/tests/assuan-test.cpp
 )
-target_link_libraries(assuan-test PRIVATE
-  assuan
-  GTest::GTest GTest::Main)
+target_compile_definitions(assuan-test PUBLIC
+  CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}/legacy/libassuan/tests"
+)
+target_link_libraries(assuan-test PUBLIC
+  neopg::assuan
+  GTest::GTest
+  GTest::Main
+)
+
 add_test(AssuanTest assuan-test COMMAND assuan-test test_xml_output --gtest_output=xml:assuan-test.xml)
 add_dependencies(tests assuan-test)
 
@@ -243,50 +262,59 @@ add_library(gcrypt STATIC
 )
 add_library(neopg::gcrypt ALIAS gcrypt)
 
-target_include_directories(gcrypt PRIVATE
-  libgpg-error/src
-  libgcrypt/mpi
-  libgcrypt/src
-  ../include
-  ${BOTAN2_INCLUDE_DIRS}
-  ${CMAKE_BINARY_DIR}/.)
-target_compile_definitions(gcrypt PRIVATE
-  HAVE_CONFIG_H=1)
-target_link_libraries(gcrypt PRIVATE
-  ${BOTAN2_LDFLAGS} ${BOTAN2_LIBRARIES}
-  neopg)
-target_compile_options(gcrypt PRIVATE
- ${BOTAN2_CFLAGS_OTHER})
+target_include_directories(gcrypt PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libgcrypt/mpi>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libgcrypt/src>
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(gcrypt PUBLIC
+  neopg::gpg-error
+  neopg::neopg
+)
+
+install(DIRECTORY libgcrypt/mpi/
+  DESTINATION include
+  FILES_MATCHING PATTERN *.h
+)
+
+install(DIRECTORY libgcrypt/src/
+  DESTINATION include
+  FILES_MATCHING PATTERN *.h
+)
+
+install(TARGETS gcrypt
+  EXPORT neopg
+  ARCHIVE
+    DESTINATION lib
+  PUBLIC_HEADER
+    DESTINATION include
+)
 
 add_executable(gcrypt-test
   libgcrypt/tests/hmac.cpp
-  libgcrypt/tests/gcrypt-test.cpp)
-target_include_directories(gcrypt-test PRIVATE
-  libgpg-error/src
-  libgcrypt/src
-  ${CMAKE_BINARY_DIR}/.)
-target_compile_options(gcrypt-test PRIVATE
+  libgcrypt/tests/gcrypt-test.cpp
 )
-target_link_libraries(gcrypt-test PRIVATE
-  gcrypt
-  gpg-error
-  GTest::GTest GTest::Main)
+target_link_libraries(gcrypt-test PUBLIC
+  neopg::gcrypt
+  GTest::GTest
+  GTest::Main
+)
+
 add_test(GcryptTest gcrypt-test COMMAND gcrypt-test test_xml_output --gtest_output=xml:gcrypt-test.xml)
 add_dependencies(tests gcrypt-test)
 
 add_executable(gcrypt-secmem-test
   libgcrypt/tests/t-secmem.cpp
-  libgcrypt/tests/gcrypt-secmem-test.cpp)
-target_include_directories(gcrypt-secmem-test PRIVATE
-    libgpg-error/src
-    libgcrypt/src
-    ${CMAKE_BINARY_DIR}/.)
-target_compile_options(gcrypt-secmem-test PRIVATE
+  libgcrypt/tests/gcrypt-secmem-test.cpp
 )
-target_link_libraries(gcrypt-secmem-test PRIVATE
-  gcrypt
-  gpg-error
-  GTest::GTest GTest::Main)
+target_link_libraries(gcrypt-secmem-test PUBLIC
+  neopg::gcrypt
+  GTest::GTest
+  GTest::Main
+)
+
 add_test(GcryptSecmemTest gcrypt-secmem-test COMMAND gcrypt-secmem-test test_xml_output --gtest_output=xml:gcrypt-secmem-test.xml)
 add_dependencies(tests gcrypt-secmem-test)
 
@@ -318,20 +346,27 @@ add_library(ksba STATIC
 )
 add_library(neopg::ksba ALIAS ksba)
 
-target_include_directories(ksba PRIVATE
-  libgpg-error/src
-  libksba/src
-  ${CMAKE_BINARY_DIR}/.
-  ${BOTAN2_INCLUDE_DIRS})
-target_link_libraries(ksba PRIVATE
-  gpg-error
-  ${BOTAN2_LDFLAGS} ${BOTAN2_LIBRARIES})
-target_compile_definitions(ksba PRIVATE
-  HAVE_CONFIG_H=1
-  ${BOTAN2_CFLAGS_OTHER}
+target_include_directories(ksba PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libksba/src>
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ksba PUBLIC
+  neopg::gpg-error
+  PkgConfig::botan-2
 )
 
-target_compile_options(ksba PRIVATE
+install(DIRECTORY libksba/src/
+  DESTINATION include
+  FILES_MATCHING PATTERN *.h
+)
+
+install(TARGETS ksba
+  EXPORT neopg
+  ARCHIVE
+    DESTINATION lib
+  PUBLIC_HEADER
+    DESTINATION include
 )
 
 add_executable(ksba-test
@@ -340,15 +375,13 @@ add_executable(ksba-test
   libksba/tests/t-crl-parser.cpp
   libksba/tests/t-dnparser.cpp
   )
-target_include_directories(ksba-test PRIVATE
-  libgpg-error/src
-  libksba/src
-  ${CMAKE_BINARY_DIR}/.)
-target_compile_definitions(ksba-test PRIVATE
-  CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}/legacy/libksba/tests")
-target_link_libraries(ksba-test PRIVATE
-  gpg-error
-  ksba
-  GTest::GTest GTest::Main)
+target_compile_definitions(ksba-test PUBLIC
+  CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}/legacy/libksba/tests"
+)
+target_link_libraries(ksba-test PUBLIC
+  neopg::ksba
+  GTest::GTest
+  GTest::Main
+)
 add_test(KsbaTest ksba-test COMMAND ksba-test test_xml_output --gtest_output=xml:ksba-test.xml)
 add_dependencies(tests ksba-test)
