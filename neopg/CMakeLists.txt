@@ -105,7 +105,27 @@ target_link_libraries(neopg PUBLIC
 
 add_library(neopg::neopg ALIAS neopg)
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg/crypto
+  DESTINATION include/neopg
+  FILES_MATCHING PATTERN *.h
+)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg/openpgp
+  DESTINATION include/neopg
+  FILES_MATCHING PATTERN *.h
+)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg/parser
+  DESTINATION include/neopg
+  FILES_MATCHING PATTERN *.h
+)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg/proto
+  DESTINATION include/neopg
+  FILES_MATCHING PATTERN *.h
+)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg/utils
   DESTINATION include/neopg
   FILES_MATCHING PATTERN *.h
 )

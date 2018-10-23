@@ -33,23 +33,9 @@ add_library(gpg-error STATIC
 
 add_library(neopg::gpg-error ALIAS gpg-error)
 
-target_include_directories(gpg-error PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libgpg-error/src>
-  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-  $<INSTALL_INTERFACE:include>
-)
-
-install(DIRECTORY libgpg-error/src/
-  DESTINATION include
-  FILES_MATCHING PATTERN *.h
-)
-
-install(TARGETS gpg-error
-  EXPORT neopg
-  ARCHIVE
-    DESTINATION lib
-  PUBLIC_HEADER
-    DESTINATION include
+target_include_directories(gpg-error PRIVATE
+  libgpg-error/src
+  ${CMAKE_BINARY_DIR}
 )
 
 add_executable(gpg-error-test
@@ -59,7 +45,11 @@ add_executable(gpg-error-test
   libgpg-error/tests/t-syserror.cpp
   libgpg-error/tests/gpg-error-test.cpp
 )
-target_link_libraries(gpg-error-test PUBLIC
+target_include_directories(gpg-error-test PRIVATE
+  libgpg-error/src
+  ${CMAKE_BINARY_DIR}
+)
+target_link_libraries(gpg-error-test PRIVATE
   neopg::gpg-error
   GTest::GTest
   GTest::Main
@@ -101,40 +91,32 @@ add_library(assuan STATIC
 
 add_library(neopg::assuan ALIAS assuan)
 
-target_include_directories(assuan PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libassuan/src>
-  $<INSTALL_INTERFACE:include>
+target_include_directories(assuan PRIVATE
+  libassuan/src
+  libgpg-error/src
+  ${CMAKE_BINARY_DIR}
 )
 
-target_compile_definitions(assuan PUBLIC
+target_compile_definitions(assuan PRIVATE
   HAVE_CONFIG_H=1
 )
-target_link_libraries(assuan PUBLIC
+
+target_link_libraries(assuan PRIVATE
   neopg::gpg-error
 )
-
-install(DIRECTORY libassuan/src/
-  DESTINATION include
-  FILES_MATCHING PATTERN *.h
-)
-
-install(TARGETS assuan
-  EXPORT neopg
-  ARCHIVE
-    DESTINATION lib
-  PUBLIC_HEADER
-    DESTINATION include
-)
-
 
 add_executable(assuan-test
   libassuan/tests/fdpassing.cpp
   libassuan/tests/assuan-test.cpp
 )
-target_compile_definitions(assuan-test PUBLIC
+target_include_directories(assuan-test PRIVATE
+  libassuan/src
+  libgpg-error/src
+)
+target_compile_definitions(assuan-test PRIVATE
   CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}/legacy/libassuan/tests"
 )
-target_link_libraries(assuan-test PUBLIC
+target_link_libraries(assuan-test PRIVATE
   neopg::assuan
   GTest::GTest
   GTest::Main
@@ -262,41 +244,27 @@ add_library(gcrypt STATIC
 )
 add_library(neopg::gcrypt ALIAS gcrypt)
 
-target_include_directories(gcrypt PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libgcrypt/mpi>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libgcrypt/src>
-  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-  $<INSTALL_INTERFACE:include>
+target_include_directories(gcrypt PRIVATE
+  libgcrypt/mpi
+  libgcrypt/src
+  libgpg-error/src
+  ${CMAKE_BINARY_DIR}
 )
 
-target_link_libraries(gcrypt PUBLIC
+target_link_libraries(gcrypt PRIVATE
   neopg::gpg-error
   neopg::neopg
-)
-
-install(DIRECTORY libgcrypt/mpi/
-  DESTINATION include
-  FILES_MATCHING PATTERN *.h
-)
-
-install(DIRECTORY libgcrypt/src/
-  DESTINATION include
-  FILES_MATCHING PATTERN *.h
-)
-
-install(TARGETS gcrypt
-  EXPORT neopg
-  ARCHIVE
-    DESTINATION lib
-  PUBLIC_HEADER
-    DESTINATION include
 )
 
 add_executable(gcrypt-test
   libgcrypt/tests/hmac.cpp
   libgcrypt/tests/gcrypt-test.cpp
 )
-target_link_libraries(gcrypt-test PUBLIC
+target_include_directories(gcrypt-test PRIVATE
+  libgcrypt/src
+  libgpg-error/src
+)
+target_link_libraries(gcrypt-test PRIVATE
   neopg::gcrypt
   GTest::GTest
   GTest::Main
@@ -309,7 +277,12 @@ add_executable(gcrypt-secmem-test
   libgcrypt/tests/t-secmem.cpp
   libgcrypt/tests/gcrypt-secmem-test.cpp
 )
-target_link_libraries(gcrypt-secmem-test PUBLIC
+target_include_directories(gcrypt-secmem-test PRIVATE
+  libgpg-error/src
+  libgcrypt/src
+  ${CMAKE_BINARY_DIR}
+)
+target_link_libraries(gcrypt-secmem-test PRIVATE
   neopg::gcrypt
   GTest::GTest
   GTest::Main
@@ -346,27 +319,14 @@ add_library(ksba STATIC
 )
 add_library(neopg::ksba ALIAS ksba)
 
-target_include_directories(ksba PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libksba/src>
-  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-  $<INSTALL_INTERFACE:include>
+target_include_directories(ksba PRIVATE
+  libksba/src
+  libgpg-error/src
+  ${CMAKE_BINARY_DIR}
 )
-target_link_libraries(ksba PUBLIC
+target_link_libraries(ksba PRIVATE
   neopg::gpg-error
   PkgConfig::botan-2
-)
-
-install(DIRECTORY libksba/src/
-  DESTINATION include
-  FILES_MATCHING PATTERN *.h
-)
-
-install(TARGETS ksba
-  EXPORT neopg
-  ARCHIVE
-    DESTINATION lib
-  PUBLIC_HEADER
-    DESTINATION include
 )
 
 add_executable(ksba-test
@@ -375,10 +335,14 @@ add_executable(ksba-test
   libksba/tests/t-crl-parser.cpp
   libksba/tests/t-dnparser.cpp
   )
-target_compile_definitions(ksba-test PUBLIC
+target_compile_definitions(ksba-test PRIVATE
   CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}/legacy/libksba/tests"
 )
-target_link_libraries(ksba-test PUBLIC
+target_include_directories(ksba-test PRIVATE
+  libgpg-error/src
+  libksba/src
+)
+target_link_libraries(ksba-test PRIVATE
   neopg::ksba
   GTest::GTest
   GTest::Main

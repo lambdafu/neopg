@@ -152,10 +152,6 @@ find_package(Threads)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/neopg-tool/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/config.h
-  DESTINATION include
-)
-
 add_subdirectory(neopg)
 add_subdirectory(legacy)
 add_subdirectory(neopg-tool)

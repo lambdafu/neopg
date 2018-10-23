@@ -234,24 +234,33 @@ add_executable(neopg-bin
 
   neopg.cpp
 )
-target_include_directories(neopg-bin PRIVATE
+target_include_directories(neopg-bin
+  PUBLIC
   $<INSTALL_INTERFACE:include>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/legacy/libgpg-error/src>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/legacy/libgcrypt/src>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/legacy/libassuan/src>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/legacy/libksba/src>
 )
 target_compile_definitions(neopg-bin PRIVATE
   CMAKE_INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}"
+  HAVE_CONFIG_H=1
 )
 
-target_link_libraries(neopg-bin PRIVATE
-  neopg::gpg-error
-  neopg::assuan
-  neopg::gcrypt
-  neopg::ksba
+target_link_libraries(neopg-bin
+  PUBLIC
   neopg::neopg-tool
   Boost::locale
   PkgConfig::libusb-1.0
   Threads::Threads
+  PRIVATE
+  neopg::gpg-error
+  neopg::assuan
+  neopg::gcrypt
+  neopg::ksba
 )
 
 set_target_properties(neopg-bin PROPERTIES OUTPUT_NAME "neopg")
@@ -264,7 +273,12 @@ install(TARGETS neopg-bin
     DESTINATION include
 )
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg-tool
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg-tool/cli
+  DESTINATION include/neopg-tool
+  FILES_MATCHING PATTERN *.h
+)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/neopg-tool/io
   DESTINATION include/neopg-tool
   FILES_MATCHING PATTERN *.h
 )
