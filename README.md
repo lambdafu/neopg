@@ -76,19 +76,30 @@ With all dependencies installed NeoPG can be build with CMake.
 
 ```bash
 $ git submodule update --init
-$ mkdir build
-$ cd build
-$ cmake ..
-$ make
-$ make test # opt: ARGS=-V or CTEST_OUTPUT_ON_FAILURE=1
+$ cmake -H. -Bbuild
+$ cmake --build build
+$ cmake --build build --target test # opt: ARGS=-V or CTEST_OUTPUT_ON_FAILURE=1
+```
+To install (default is /usr/local)
+
+```bash
+$ cmake --build build --target install
+```
+
+To change default installation, set cmake parameter `CMAKE_INSTALL_PREFIX` for example:
+
+```bash
+$ cmake -H. -Build -DCMAKE_INSTALL_PREFIX=<path>
 ```
 
 Select your compiler and language version by setting CXX and CXXSTD
 environment variables, e.g.:
 
 ```bash
-$ CXX=clang++-5 CXXSTD=14 cmake ..
+$ CXX=clang++-5 CXXSTD=14 cmake -H. -Bbuild
 ```
+or set cmake parameter `CMAKE_CXX_COMPILER` `CMAKE_CXX_STANDARD`
+
 
 ### Legacy support
 
@@ -121,17 +132,17 @@ To enable a debug build, set the CMAKE_BUILD_TYPE flag (default is `Release`):
 
 ```bash
 # cmake -DCMAKE_BUILD_TYPE=Debug -DCOVERAGE=ON ..
-# make coverage
+# cmake --build build --target coverage
 ```
 
 Other targets:
 
 ```
-$ make pretty        # Run clang-format on all source files
-$ make lint          # Run cppcheck
-$ make coverage      # Just coverage.info for codecov.io
-$ make coverage-html # Local HTML report
-$ make coverage-data # Cobertura XML report
+$ cmake --build build --target pretty        # Run clang-format on all source files
+$ cmake --build build --target lint          # Run cppcheck
+$ cmake --build build --target coverage      # Just coverage.info for codecov.io
+$ cmake --build build --target coverage-html # Local HTML report
+$ cmake --build build --target coverage-data # Cobertura XML report
 ```
 
 ## TODO
@@ -176,9 +187,8 @@ $ sudo dnf install -y \
 
 # Clone repo and build
 $ git clone --recursive git@github.com:das-labor/neopg.git
-$ cd neopg/build
-$ cmake ..
-$ make
+$ cmake -Hneopg -Bneopg/build
+$ cmake --build neopg/build
 ```
 
 ### macOS
@@ -202,9 +212,8 @@ Build it!
 ```
 # Clone repo and build
 $ git clone --recursive git@github.com:das-labor/neopg.git
-$ cd neopg/build
-$ cmake ..
-$ make
+$ cmake -Hneopg -Bneopg/build
+$ cmake --build neopg/build
 ```
 
 Have fun!
