@@ -85,9 +85,9 @@ target_include_directories(neopg PUBLIC
   $<INSTALL_INTERFACE:include>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<BUILD_INTERFACE:${TAO-PEGTL_ROOT}/include> #TODO(Bjoe) use tao::pegtl
-  $<BUILD_INTERFACE:${TAOCPP-JSON_ROOT}/include> #TODO(Bjoe) use taocpp::json
-  $<BUILD_INTERFACE:${CURL_INCLUDE_DIRS}> #TODO(Bjoe) use curl::curl
+  $<BUILD_INTERFACE:${PEGTL_ROOT}/include>
+  $<BUILD_INTERFACE:${JSON_ROOT}/include>
+  $<BUILD_INTERFACE:${CURL_INCLUDE_DIRS}>
 )
 
 
@@ -98,9 +98,7 @@ target_compile_options(neopg
 
 target_link_libraries(neopg PUBLIC
   PkgConfig::botan-2
-#  tao::pegtl
-#  taocpp::json
-  ${CURL_LDFLAGS} ${CURL_LIBRARIES} #TODO(Bjoe) use curl::curl
+  ${CURL_LDFLAGS} ${CURL_LIBRARIES}
 )
 
 add_library(neopg::neopg ALIAS neopg)

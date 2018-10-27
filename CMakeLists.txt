@@ -55,10 +55,10 @@ add_custom_target(tests)
 enable_testing()
 
 # PEGTL
-set(TAO-PEGTL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/pegtl)
-set(PEGTL_INCLUDE_DIR ${TAO-PEGTL_ROOT}/include)
+set(PEGTL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/pegtl)
+set(PEGTL_INCLUDE_DIR ${PEGTL_ROOT}/include)
 set(PEGTL_BUILD_TESTS OFF CACHE BOOL "")
-add_subdirectory(${TAO-PEGTL_ROOT} EXCLUDE_FROM_ALL)
+add_subdirectory(${PEGTL_ROOT} EXCLUDE_FROM_ALL)
 
 
 # Rang
@@ -74,10 +74,10 @@ set(SPDLOG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/spdlog)
 set(SPDLOG_INCLUDE_DIR ${SPDLOG_ROOT}/include)
 
 # json
-set(TAOCPP-JSON_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/json)
-set(JSON_INCLUDE_DIR ${TAOCPP-JSON_ROOT}/include)
+set(JSON_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/json)
+set(JSON_INCLUDE_DIR ${JSON_ROOT}/include)
 set(TAOCPP_JSON_BUILD_TESTS OFF CACHE BOOL "")
-add_subdirectory(${TAOCPP-JSON_ROOT} EXCLUDE_FROM_ALL)
+add_subdirectory(${JSON_ROOT} EXCLUDE_FROM_ALL)
 
 # CodeCoverage
 
@@ -86,30 +86,30 @@ ProcessorCount(PROCESSOR_COUNT)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 
-  option(COVERAGE "Create coverage data")
+option(COVERAGE "Create coverage data")
 
-  if(COVERAGE)
+if(COVERAGE)
 
-    include(CodeCoverage)
-    APPEND_COVERAGE_COMPILER_FLAGS()
+include(CodeCoverage)
+APPEND_COVERAGE_COMPILER_FLAGS()
 
-    set(COVERAGE_EXCLUDES '*/3rdparty/*' '*/usr/*' '*/nix/store/*')
-    SETUP_TARGET_FOR_COVERAGE(
-	 NAME coverage
-	 EXECUTABLE ctest
-	 DEPENDENCIES tests
-    )
-    SETUP_TARGET_FOR_COVERAGE_HTML(
-	 NAME coverage-html
-	 EXECUTABLE ctest
-	 DEPENDENCIES tests
-    )
-    SETUP_TARGET_FOR_COVERAGE_COBERTURA(
-	 NAME coverage-data
-	 EXECUTABLE ctest
-	 DEPENDENCIES tests
-    )
-  endif(COVERAGE)
+set(COVERAGE_EXCLUDES '*/3rdparty/*' '*/usr/*' '*/nix/store/*')
+SETUP_TARGET_FOR_COVERAGE(
+     NAME coverage
+     EXECUTABLE ctest
+     DEPENDENCIES tests
+)
+SETUP_TARGET_FOR_COVERAGE_HTML(
+     NAME coverage-html
+     EXECUTABLE ctest
+     DEPENDENCIES tests
+)
+SETUP_TARGET_FOR_COVERAGE_COBERTURA(
+     NAME coverage-data
+     EXECUTABLE ctest
+     DEPENDENCIES tests
+)
+endif(COVERAGE)
 
 endif(CMAKE_BUILD_TYPE MATCHES Debug)
 
@@ -145,7 +145,7 @@ pkg_check_modules(botan-2 REQUIRED IMPORTED_TARGET botan-2)
 pkg_check_modules(libusb-1.0 REQUIRED IMPORTED_TARGET libusb-1.0)
 pkg_check_modules(gnutls REQUIRED IMPORTED_TARGET gnutls)
 
-find_package(Boost COMPONENTS locale REQUIRED)
+find_package(Boost COMPONENTS locale date_time REQUIRED)
 
 find_package(CURL REQUIRED)
 find_package(Threads)
