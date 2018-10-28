@@ -23,8 +23,12 @@ addons:
       - libusb-1.0-0-dev
       - libbz2-dev
       - libgnutls-dev
-      - libcurl4-gnutls-dev
       - gettext
+
+before_install:
+      # libcurl4-gnutls-dev should be installed after git clone because this package breaks git clone with following error:
+      # fatal: unable to access 'https://github.com/das-labor/neopg.git/': server certificate verification failed. CAfile: none CRLfile: none
+      - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y libcurl4-gnutls-dev; fi
 
 matrix:
   include:
@@ -276,6 +280,7 @@ install:
       brew link --force gettext
       # Already installed: cmake boost
     else
+      git config --global http.sslCAinfo /etc/ssl/certs/ca-certificates.crt # This is needed because libcurl4-gnutls-dev pkgs breaks git clone with a certificate error.
       git clone https://github.com/randombit/botan.git
       (cd botan;
       git checkout 2.3.0;
