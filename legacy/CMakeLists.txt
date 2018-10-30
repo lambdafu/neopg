@@ -56,6 +56,7 @@ target_link_libraries(gpg-error-test PRIVATE
 )
 
 add_test(GpgErrorTest gpg-error-test COMMAND gpg-error-test test_xml_output --gtest_output=xml:gpg-error-test.xml)
+add_dependencies(tests gpg-error-test)
 
 # libassuan
 
