@@ -22,6 +22,8 @@ include(GitRelease)
 # Add user-settable options.
 option(BUILD_SHARED_LIBS "Build shared libraries." ON)
 
+list(APPEND CMAKE_MODULE_PATH cmake)
+include(GitCheckout)
 
 # Compiler setup.
 
@@ -44,6 +46,9 @@ if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
   set(gtest_force_shared_crt ON CACHE BOOL
     "Use shared (DLL) run-time lib even when Google Test is built as static lib.")
 endif()
+if(NOT EXISTS ${GTEST_ROOT})
+	try_checkout("${GTEST_ROOT}" "3rdparty/googletest")
+endif()
 add_subdirectory(${GTEST_ROOT} EXCLUDE_FROM_ALL)
 add_library(GTest::GTest ALIAS gtest)
 add_library(GTest::Main ALIAS gtest_main)
@@ -58,12 +63,18 @@ enable_testing()
 set(PEGTL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/pegtl)
 set(PEGTL_INCLUDE_DIR ${PEGTL_ROOT}/include)
 set(PEGTL_BUILD_TESTS OFF CACHE BOOL "")
+if(NOT EXISTS ${PEGTL_INCLUDE_DIR})
+	try_checkout("${PEGTL_INCLUDE_DIR}" "3rdparty/pegtl")
+endif()
 add_subdirectory(${PEGTL_ROOT} EXCLUDE_FROM_ALL)
 
 
 # Rang
 set(RANG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/rang)
 set(RANG_INCLUDE_DIR ${RANG_ROOT}/include)
+if(NOT EXISTS ${RANG_INCLUDE_DIR})
+	try_checkout("${RANG_INCLUDE_DIR}" "3rdparty/rang")
+endif()
 
 # CLI11
 set(CLI11_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/CLI11)
@@ -72,11 +83,17 @@ set(CLI11_INCLUDE_DIR ${CLI11_ROOT}/include)
 # Spdlog
 set(SPDLOG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/spdlog)
 set(SPDLOG_INCLUDE_DIR ${SPDLOG_ROOT}/include)
+if(NOT EXISTS ${SPDLOG_INCLUDE_DIR})
+	try_checkout("${SPDLOG_INCLUDE_DIR}" "3rdparty/spdlog")
+endif()
 
 # json
 set(JSON_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/json)
 set(JSON_INCLUDE_DIR ${JSON_ROOT}/include)
 set(TAOCPP_JSON_BUILD_TESTS OFF CACHE BOOL "")
+if(NOT EXISTS ${JSON_INCLUDE_DIR})
+	try_checkout("${JSON_INCLUDE_DIR}" "3rdparty/json")
+endif()
 add_subdirectory(${JSON_ROOT} EXCLUDE_FROM_ALL)
 
 # CodeCoverage
